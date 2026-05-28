@@ -1,0 +1,1 @@
+// Números, duração, referências bíblicas

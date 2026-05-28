@@ -1,0 +1,1 @@
+// ReaderScreen — Navegador bíblico

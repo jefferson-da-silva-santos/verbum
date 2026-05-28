@@ -1,0 +1,1 @@
+// Métricas globais de progresso
