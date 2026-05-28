@@ -6,7 +6,7 @@
  */
 
 import { BaseRepository } from "./BaseRepository";
-import type { Favorite, CreateFavoriteInput } from "../types";
+import type { Favorite, CreateFavoriteInput } from "../../types";
 
 interface FavoriteRow {
   id: string;
