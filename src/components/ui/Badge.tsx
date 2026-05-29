@@ -1,6 +1,3 @@
-// ─── Badge ───────────────────────────────────
-
-
 import { View, Text } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 

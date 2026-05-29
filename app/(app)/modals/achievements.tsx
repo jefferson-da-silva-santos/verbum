@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../../src/context/ThemeContext';
 import { useAchievements } from '../../../src/hooks/useAchievements';
-import { ProgressBar } from '../../../src/components/ui/Card';
+import { ProgressBar } from '@/src/components/ui/ProgressBar';
 import { RARITY_COLORS } from '../../../src/constants/achievements';
 
 export default function AchievementsModal() {
@@ -39,16 +39,16 @@ export default function AchievementsModal() {
 
       <SectionList
         sections={sections}
-        keyExtractor={item => item.key}
+        keyExtractor={(item: any) => item.key}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 48 }}
-        renderSectionHeader={({ section }) => (
+        renderSectionHeader={({ section }: any) => (
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8, backgroundColor: tokens.bgPrimary }}>
             <Text style={{ fontSize: 11, fontWeight: '600', color: tokens.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8 }}>{section.title}</Text>
             <Text style={{ fontSize: 11, color: tokens.textDisabled }}>{section.count}</Text>
           </View>
         )}
-        renderItem={({ item: a }) => {
+        renderItem={({ item: a }: any) => {
           const unlocked = unlockedKeys.has(a.key);
           return (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: tokens.borderLight, opacity: unlocked ? 1 : 0.45 }}>
