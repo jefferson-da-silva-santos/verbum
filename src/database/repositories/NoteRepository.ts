@@ -4,9 +4,9 @@
  * Gerencia anotações vinculadas a capítulos ou versículos específicos.
  */
 
-import { BaseRepository } from "./BaseRepository";
-import type { Note, CreateNoteInput, UpdateNoteInput } from "../../types";
 import type { NoteType } from "../../constants";
+import type { CreateNoteInput, Note, UpdateNoteInput } from "../types";
+import { BaseRepository } from "./BaseRepository";
 
 interface NoteRow {
   id: string;

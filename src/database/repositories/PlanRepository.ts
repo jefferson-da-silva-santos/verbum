@@ -6,15 +6,15 @@
  * são inseridos dentro de uma única transação.
  */
 
-import { BaseRepository } from "./BaseRepository";
+import type { ChapterRef } from "../../constants";
 import type {
-  ReadingPlan,
-  PlanScheduleEntry,
   CreatePlanInput,
   CreateScheduleEntryInput,
+  PlanScheduleEntry,
+  ReadingPlan,
   ScopeData,
-} from "../../types";
-import type { ChapterRef } from "../../constants";
+} from "../types";
+import { BaseRepository } from "./BaseRepository";
 
 // ─────────────────────────────────────────────
 // ROW TYPES

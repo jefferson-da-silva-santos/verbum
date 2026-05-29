@@ -5,8 +5,8 @@
  * uma conquista desbloqueada nunca é removida.
  */
 
+import type { AchievementRecord } from "../types";
 import { BaseRepository } from "./BaseRepository";
-import type { AchievementRecord } from "../../types";
 
 interface AchievementRow {
   id: string;

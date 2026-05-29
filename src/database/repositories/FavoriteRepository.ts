@@ -5,8 +5,8 @@
  * UNIQUE(user_id, book_slug, chapter_number, verse_number) garante sem duplicatas.
  */
 
+import type { CreateFavoriteInput, Favorite } from "../types";
 import { BaseRepository } from "./BaseRepository";
-import type { Favorite, CreateFavoriteInput } from "../../types";
 
 interface FavoriteRow {
   id: string;
