@@ -1,195 +1,197 @@
 /**
- * VERBUM — API: Endpoints e Tipos de Resposta
+ * VERBUM — src/api/endpoints.ts  [FINAL — documentação oficial]
  *
- * Base URL, builders de URL e tipos TypeScript que espelham
- * fielmente o contrato da BIBLIAAPI v2.
+ * Endpoints corretos conforme docs em https://bibliaapi.com.br/api/v2
  *
- * Documentação: https://bibliaapi.com.br
- * Autenticação: Bearer token via chave gerada no painel da API
+ * ERROS ANTERIORES CORRIGIDOS:
  *
- * Configuração da chave:
- *   1. Crie um arquivo .env na raiz do projeto
- *   2. Adicione: EXPO_PUBLIC_BIBLIA_API_KEY=sua_chave_aqui
- *   3. A variável é lida em build-time pelo Expo (prefixo EXPO_PUBLIC_)
+ *  1. Capítulo completo:
+ *     ERRADO: /versions/acf/books/gn/chapters/1/verses   ← não existe
+ *     CERTO:  /versions/ACF/books/gn/chapters/1          ← sem /verses
  *
- * NUNCA commitar a chave em repositório. Adicione .env ao .gitignore.
+ *  2. Versão em MAIÚSCULAS:
+ *     ERRADO: acf, nvi, ara
+ *     CERTO:  ACF, NVI, ARA
+ *
+ *  3. Busca:
+ *     ERRADO: /verses/search?q=amor&version=ACF
+ *     CERTO:  /versions/ACF/search?q=amor
+ *
+ * Referência dos endpoints (auth = Bearer ou X-API-Key):
+ *   GET /versions                                          → sem auth
+ *   GET /books                                             → sem auth
+ *   GET /versions/{VER}/books/{book}/chapters/{n}          → com auth ✓
+ *   GET /versions/{VER}/books/{book}/chapters/{n}/verses/{v} → com auth
+ *   GET /versions/{VER}/random                             → com auth
+ *   GET /versions/{VER}/search?q={termo}                  → com auth
  */
 
-// ─────────────────────────────────────────────
-// CONFIGURAÇÃO BASE
-// ─────────────────────────────────────────────
-
-export const BIBLIA_API_BASE_URL = "https://bibliaapi.com.br/api/v2";
-
-/** Timeout padrão em milissegundos para cada requisição */
-export const API_REQUEST_TIMEOUT_MS = 12_000;
-
-/** Número máximo de tentativas automáticas em caso de falha de rede */
-export const API_MAX_RETRIES = 2;
-
-/** Delay entre retentativas (ms) — aumenta exponencialmente */
+export const BIBLIA_API_BASE_URL     = 'https://bibliaapi.com.br/api/v2';
+export const API_REQUEST_TIMEOUT_MS  = 20_000;
+export const API_MAX_RETRIES         = 2;
 export const API_RETRY_BASE_DELAY_MS = 800;
 
 // ─────────────────────────────────────────────
-// BUILDERS DE URL
+// ENDPOINTS
 // ─────────────────────────────────────────────
 
 export const Endpoints = {
-  /** GET /versions → lista todas as versões disponíveis */
+
+  /** GET /versions  → lista versões (sem auth) */
   versions: (): string => `/versions`,
 
-  /** GET /versions/{v}/books → lista todos os 66 livros */
-  books: (version: string): string => `/versions/${version}/books`,
+  /** GET /books  → lista 66 livros (sem auth) */
+  books: (): string => `/books`,
 
-  /** GET /versions/{v}/books/{b}/chapters → lista capítulos de um livro */
-  chapters: (version: string, bookSlug: string): string =>
-    `/versions/${version}/books/${bookSlug}/chapters`,
+  /**
+   * CAPÍTULO COMPLETO  ← endpoint principal do leitor
+   * GET /versions/{VER}/books/{book}/chapters/{n}
+   *
+   * Exemplo: /versions/ACF/books/gn/chapters/1
+   * Retorna o livro + array de versículos do capítulo.
+   */
+  chapterFull: (version: string, bookAbbrev: string, chapter: number): string =>
+    `/versions/${version}/books/${bookAbbrev}/chapters/${chapter}`,
 
-  /** GET /versions/{v}/books/{b}/chapters/{n}/verses → todos os versículos de um capítulo */
-  chapterVerses: (version: string, bookSlug: string, chapter: number): string =>
-    `/versions/${version}/books/${bookSlug}/chapters/${chapter}/verses`,
+  /**
+   * VERSÍCULO ÚNICO
+   * GET /versions/{VER}/books/{book}/chapters/{n}/verses/{v}
+   *
+   * Exemplo: /versions/ACF/books/jo/chapters/3/verses/16
+   */
+  verse: (version: string, bookAbbrev: string, chapter: number, verse: number): string =>
+    `/versions/${version}/books/${bookAbbrev}/chapters/${chapter}/verses/${verse}`,
 
-  /** GET /versions/{v}/books/{b}/chapters/{n}/verses/{v} → versículo individual */
-  verse: (
-    version: string,
-    bookSlug: string,
-    chapter: number,
-    verse: number,
-  ): string =>
-    `/versions/${version}/books/${bookSlug}/chapters/${chapter}/verses/${verse}`,
+  /**
+   * VERSÍCULO ALEATÓRIO
+   * GET /versions/{VER}/random
+   */
+  random: (version: string): string =>
+    `/versions/${version}/random`,
 
-  /** GET /search?q={termo}&version={v} → busca por palavra ou expressão */
+  /**
+   * BUSCA POR TEXTO
+   * GET /versions/{VER}/search?q={termo}
+   *
+   * Exemplo: /versions/ACF/search?q=amor
+   */
   search: (query: string, version: string): string =>
-    `/search?q=${encodeURIComponent(query)}&version=${version}`,
+    `/versions/${version}/search?q=${encodeURIComponent(query)}`,
+
 } as const;
 
 // ─────────────────────────────────────────────
-// TIPOS DE RESPOSTA DA API
+// TIPOS DE RESPOSTA
 // ─────────────────────────────────────────────
 
-/** Abreviações de um livro (multilíngue) */
-export interface ApiBookAbbrev {
-  pt: string;
-  en: string;
-}
+export interface ApiBookAbbrev { pt: string; en: string; }
 
-/** Metadados de livro retornados junto a cada endpoint */
 export interface ApiBookMeta {
-  abbrev: ApiBookAbbrev;
+  abbrev:   ApiBookAbbrev;
   chapters: number;
-  name: string;
-  author: string;
-  group: string;
-  version: string;
+  name:     string;
+  author:   string;
+  group:    string;
+  version:  string;
 }
 
-/** Versículo individual */
 export interface ApiVerse {
   number: number;
-  text: string;
+  text:   string;
 }
 
 /**
- * Resposta do endpoint chapterVerses
- * GET /versions/{v}/books/{b}/chapters/{n}/verses
+ * Resposta de GET /versions/{VER}/books/{book}/chapters/{n}
+ *
+ * A API pode retornar versículos em dois formatos:
+ *   A) chapter.verses = ApiVerse[]  (array dentro do objeto chapter)
+ *   B) verses = ApiVerse[]          (array no nível raiz)
+ *
+ * O normalizer em bibliaApi.ts trata ambos.
  */
-export interface ApiChapterResponse {
+export interface ApiChapterRaw {
   book: ApiBookMeta;
   chapter: {
     number: number;
-    verses: number;
+    verses: ApiVerse[] | number; // array OU contagem total
   };
-  verses: ApiVerse[];
+  verses?: ApiVerse[]; // presente se o formato for B
 }
 
-/**
- * Versículo individual com metadados
- * GET /versions/{v}/books/{b}/chapters/{n}/verses/{n}
- */
+/** Formato normalizado interno (uniforme independente do formato da API) */
+export interface ApiChapterResponse {
+  book:    ApiBookMeta;
+  chapter: { number: number; verses: number };
+  verses:  ApiVerse[];
+}
+
 export interface ApiVerseResponse {
-  book: ApiBookMeta;
+  version: string;
+  book:    string;
   chapter: number;
-  verse: ApiVerse;
+  verse:   number;
+  text:    string;
 }
 
-/** Item de resultado de busca */
-export interface ApiSearchVerse {
-  book: ApiBookMeta;
+export interface ApiSearchItem {
+  book:    ApiBookMeta;
   chapter: number;
-  number: number;
-  text: string;
+  number:  number;
+  text:    string;
 }
 
-/**
- * Resposta do endpoint de busca
- * GET /search?q={query}&version={v}
- */
 export interface ApiSearchResponse {
-  verses: ApiSearchVerse[];
+  verses:     ApiSearchItem[];
   occurrence: number;
 }
 
-/** Um livro da lista retornada por /books */
 export interface ApiBookListItem {
-  abbrev: ApiBookAbbrev;
+  abbrev:   ApiBookAbbrev;
   chapters: number;
-  name: string;
-  author: string;
-  group: string;
+  name:     string;
+  author:   string;
+  group:    string;
 }
 
-/** Uma versão bíblica disponível */
 export interface ApiVersionItem {
   version: string;
-  verses: number;
+  verses:  number;
 }
 
 // ─────────────────────────────────────────────
-// ERROS DA API
+// ERROS
 // ─────────────────────────────────────────────
 
 export type ApiErrorCode =
-  | "NETWORK_ERROR" // sem conexão / timeout
-  | "UNAUTHORIZED" // 401 — chave inválida ou expirada
-  | "NOT_FOUND" // 404 — livro, capítulo ou versículo não existe
-  | "RATE_LIMIT" // 429 — limite de requisições excedido
-  | "SERVER_ERROR" // 5xx — erro no servidor da BIBLIAAPI
-  | "TIMEOUT" // requisição excedeu API_REQUEST_TIMEOUT_MS
-  | "INVALID_RESPONSE" // JSON malformado ou schema inesperado
-  | "MISSING_API_KEY"; // EXPO_PUBLIC_BIBLIA_API_KEY não configurada
+  | 'NETWORK_ERROR' | 'UNAUTHORIZED' | 'NOT_FOUND'
+  | 'RATE_LIMIT'    | 'SERVER_ERROR' | 'TIMEOUT'
+  | 'INVALID_RESPONSE' | 'MISSING_API_KEY';
 
 export class ApiError extends Error {
   constructor(
-    public readonly code: ApiErrorCode,
-    public readonly status: number,
+    public readonly code:     ApiErrorCode,
+    public readonly status:   number,
     message: string,
     public readonly original?: unknown,
   ) {
     super(message);
-    this.name = "ApiError";
+    this.name = 'ApiError';
   }
 
-  get isNetworkRelated(): boolean {
-    return this.code === "NETWORK_ERROR" || this.code === "TIMEOUT";
-  }
+  get isNetworkRelated() { return this.code === 'NETWORK_ERROR' || this.code === 'TIMEOUT'; }
+  get isAuthError()      { return this.code === 'UNAUTHORIZED'  || this.code === 'MISSING_API_KEY'; }
 
-  get isAuthError(): boolean {
-    return this.code === "UNAUTHORIZED" || this.code === "MISSING_API_KEY";
-  }
-
-  /** Mensagem legível para exibir ao usuário */
   get userMessage(): string {
-    const messages: Record<ApiErrorCode, string> = {
-      NETWORK_ERROR:
-        "Sem conexão com a internet. Exibindo dados do cache local.",
-      UNAUTHORIZED: "Chave de API inválida. Verifique as configurações.",
-      NOT_FOUND: "Conteúdo não encontrado.",
-      RATE_LIMIT: "Muitas requisições. Tente novamente em instantes.",
-      SERVER_ERROR: "Erro no servidor. Tente novamente.",
-      TIMEOUT: "Conexão lenta. Exibindo dados do cache.",
-      INVALID_RESPONSE: "Resposta inesperada da API.",
-      MISSING_API_KEY: "API key não configurada. Verifique o arquivo .env.",
+    const m: Record<ApiErrorCode, string> = {
+      NETWORK_ERROR:    'Sem conexão. Verifique sua internet.',
+      UNAUTHORIZED:     'Chave de API inválida. Verifique o .env.',
+      NOT_FOUND:        'Conteúdo não encontrado.',
+      RATE_LIMIT:       'Muitas requisições. Aguarde.',
+      SERVER_ERROR:     'Erro no servidor da BIBLIAAPI.',
+      TIMEOUT:          'Conexão lenta. Tente novamente.',
+      INVALID_RESPONSE: 'Resposta inesperada da API.',
+      MISSING_API_KEY:  'Chave não configurada no .env.',
     };
-    return messages[this.code];
+    return m[this.code];
   }
 }

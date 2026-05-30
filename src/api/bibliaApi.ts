@@ -1,28 +1,19 @@
 /**
- * VERBUM — API: BibleApiClient
+ * VERBUM — src/api/bibliaApi.ts  [DEFINITIVO]
  *
- * Cliente HTTP para a BIBLIAAPI v2. Responsabilidades:
- *   - Autenticação via Bearer token (EXPO_PUBLIC_BIBLIA_API_KEY)
- *   - Timeout com AbortController
- *   - Retry automático em falhas de rede (não em 4xx)
- *   - Tipagem completa das respostas
- *   - Classificação de erros em ApiError
- *
- * NÃO implementa cache — isso é responsabilidade do CacheManager.
- * NÃO acessa banco de dados.
- *
- * Uso direto (raramente necessário — prefira CacheManager):
- *   const data = await BibleApiClient.getChapterVerses('acf', 'gn', 1);
+ * Normalizer defensivo que aceita QUALQUER estrutura de resposta da BIBLIAAPI.
+ * Na primeira execução loga o JSON raw para diagnóstico:
+ *   [BIBLIAAPI] Raw response (primeiros 600 chars): {...}
  */
 
 import {
   BIBLIA_API_BASE_URL,
-  API_REQUEST_TIMEOUT_MS,
   API_MAX_RETRIES,
   API_RETRY_BASE_DELAY_MS,
+  API_REQUEST_TIMEOUT_MS,
   Endpoints,
   ApiError,
-} from "./endpoints";
+} from './endpoints';
 
 import type {
   ApiChapterResponse,
@@ -30,43 +21,121 @@ import type {
   ApiSearchResponse,
   ApiBookListItem,
   ApiVersionItem,
-  ApiErrorCode,
-} from "./endpoints";
+} from './endpoints';
 
-// ─────────────────────────────────────────────
-// CONFIGURAÇÃO DE API KEY
-// ─────────────────────────────────────────────
+// ─── Slugs → abreviações da API ──────────────
 
-/**
- * Recupera a API key da variável de ambiente.
- *
- * Configuração:
- *   1. Crie .env na raiz: EXPO_PUBLIC_BIBLIA_API_KEY=sua_chave
- *   2. Reinicie o servidor Expo após alterar o .env
- *
- * Em produção (EAS Build): configure como secret no painel da Expo.
- */
+const SLUG_TO_ABBREV: Record<string, string> = {
+  gn:'gn',ex:'ex',lv:'lv',nm:'nm',dt:'dt',
+  js:'js',jz:'jz',rt:'rt',
+  '1sm':'1sm','2sm':'2sm','1rs':'1rs','2rs':'2rs',
+  '1cr':'1cr','2cr':'2cr',ed:'ed',ne:'ne',et:'et',
+  job:'jó',jó:'jó',
+  sl:'sl',pv:'pv',ec:'ec',ct:'ct',
+  is:'is',jr:'jr',lm:'lm',ez:'ez',dn:'dn',
+  os:'os',jl:'jl',am:'am',ob:'ob',jn:'jn',
+  mq:'mq',na:'na',hc:'hc',sf:'sf',ag:'ag',zc:'zc',ml:'ml',
+  mt:'mt',mc:'mc',lc:'lc',jo:'jo',at:'at',rm:'rm',
+  '1co':'1co','2co':'2co',gl:'gl',ef:'ef',fp:'fp',cl:'cl',
+  '1ts':'1ts','2ts':'2ts','1tm':'1tm','2tm':'2tm',
+  tt:'tt',fm:'fm',hb:'hb',tg:'tg',
+  '1pe':'1pe','2pe':'2pe','1jo':'1jo','2jo':'2jo','3jo':'3jo',
+  jd:'jd',ap:'ap',
+};
+
+function toAbbrev(slug: string): string {
+  return SLUG_TO_ABBREV[slug] ?? slug;
+}
+
+function toApiVersion(v: string): string {
+  return v.toUpperCase(); // acf → ACF
+}
+
+// ─── Normalizer defensivo ────────────────────
+//
+// Possíveis estruturas de resposta da BIBLIAAPI:
+//  A) { book, chapter: { number, verses: [{number,text},...] } }
+//  B) { book, chapter: { number, verses: 31 }, verses: [...] }
+//  C) { book, chapter: 1, verses: [...] }
+//  D) { book, verses: [...] }
+//  E) { data: { book, verses: [...] } }  ← Laravel Resource wrapper
+//  F) { data: [...] }
+//  G) [...]
+
+type AnyObj = Record<string, unknown>;
+
+function extractVerses(raw: unknown): { number: number; text: string }[] {
+  if (Array.isArray(raw)) return raw as { number:number; text:string }[];
+
+  const r = raw as AnyObj;
+
+  // Wrapper Laravel Resource
+  if (r.data !== undefined) {
+    if (Array.isArray(r.data)) return r.data as { number:number; text:string }[];
+    return extractVerses(r.data);
+  }
+
+  // chapter.verses é array
+  const ch = r.chapter as AnyObj | undefined;
+  if (ch && Array.isArray(ch.verses)) return ch.verses as { number:number; text:string }[];
+
+  // verses no nível raiz
+  if (Array.isArray(r.verses)) return r.verses as { number:number; text:string }[];
+
+  return [];
+}
+
+function extractChapterNumber(raw: unknown): number {
+  const r    = raw as AnyObj;
+  const body = (r.data !== undefined ? r.data : r) as AnyObj;
+  const ch   = body.chapter;
+  if (typeof ch === 'number') return ch;
+  if (ch && typeof (ch as AnyObj).number === 'number') return (ch as AnyObj).number as number;
+  if (typeof body.number === 'number') return body.number as number;
+  return 0;
+}
+
+function extractBook(raw: unknown): ApiChapterResponse['book'] {
+  const r    = raw as AnyObj;
+  const body = (r.data !== undefined ? r.data : r) as AnyObj;
+  return (body.book as ApiChapterResponse['book']) ?? {
+    abbrev: { pt: '?', en: '?' }, chapters: 0, name: 'Desconhecido',
+    author: '', group: '', version: '',
+  };
+}
+
+function normalizeChapterResponse(raw: unknown): ApiChapterResponse {
+  // LOG DIAGNÓSTICO — mostra a estrutura real na primeira execução
+  console.log('[BIBLIAAPI] Raw response (600 chars):', JSON.stringify(raw).slice(0, 600));
+
+  const verses = extractVerses(raw);
+  const num    = extractChapterNumber(raw);
+  const book   = extractBook(raw);
+
+  if (verses.length === 0) {
+    console.warn('[BIBLIAAPI] Nenhum versículo extraído! Estrutura completa:', JSON.stringify(raw));
+  }
+
+  return {
+    book,
+    chapter: { number: num, verses: verses.length },
+    verses,
+  };
+}
+
+// ─── Auth ─────────────────────────────────────
+
 function getApiKey(): string {
   const key = process.env.EXPO_PUBLIC_BIBLIA_API_KEY;
-  if (!key || key.trim() === "") {
-    throw new ApiError(
-      "MISSING_API_KEY",
-      0,
-      "EXPO_PUBLIC_BIBLIA_API_KEY não encontrada. Configure o arquivo .env na raiz do projeto.",
-    );
-  }
+  if (!key?.trim()) throw new ApiError('MISSING_API_KEY', 0, 'EXPO_PUBLIC_BIBLIA_API_KEY não configurada no .env');
   return key.trim();
 }
 
-// ─────────────────────────────────────────────
-// HELPERS INTERNOS
-// ─────────────────────────────────────────────
-
 function buildHeaders(): Record<string, string> {
   return {
-    Authorization: `Bearer ${getApiKey()}`,
-    "Content-Type": "application/json",
-    Accept: "application/json",
+    'Authorization': `Bearer ${getApiKey()}`,
+    'Content-Type':  'application/json',
+    'Accept':        'application/json',
   };
 }
 
@@ -74,227 +143,109 @@ function buildUrl(endpoint: string): string {
   return `${BIBLIA_API_BASE_URL}${endpoint}`;
 }
 
-/** Delay assíncrono para retentativas com backoff exponencial */
 function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise(r => setTimeout(r, ms));
 }
 
-/**
- * Classifica o status HTTP em ApiErrorCode.
- */
-function classifyHttpError(status: number): ApiErrorCode {
-  if (status === 401 || status === 403) return "UNAUTHORIZED";
-  if (status === 404) return "NOT_FOUND";
-  if (status === 429) return "RATE_LIMIT";
-  if (status >= 500) return "SERVER_ERROR";
-  return "SERVER_ERROR";
-}
+// ─── Requisição HTTP ──────────────────────────
 
-// ─────────────────────────────────────────────
-// NÚCLEO DE REQUISIÇÃO
-// ─────────────────────────────────────────────
-
-/**
- * Executa uma requisição GET com timeout e retentativas.
- *
- * Política de retry:
- *   - Retenta apenas em falhas de rede (NETWORK_ERROR, TIMEOUT)
- *   - NÃO retenta em erros 4xx (lógicos) ou 5xx estáveis
- *   - Backoff: 800ms → 1600ms → 3200ms
- */
-async function request<T>(endpoint: string, attempt: number = 0): Promise<T> {
+async function request<T>(endpoint: string, attempt = 0): Promise<T> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(
-    () => controller.abort(),
-    API_REQUEST_TIMEOUT_MS,
-  );
+  const timeoutId  = setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS);
+  const url        = buildUrl(endpoint);
+
+  console.log(`[BIBLIAAPI] GET ${url}${attempt > 0 ? ` (retry ${attempt})` : ''}`);
 
   try {
-    const response = await fetch(buildUrl(endpoint), {
-      method: "GET",
-      headers: buildHeaders(),
-      signal: controller.signal,
+    const response = await fetch(url, {
+      method: 'GET', headers: buildHeaders(), signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
 
-    // Erro HTTP
+    let body = '';
+    try { body = await response.text(); } catch { /* ignora */ }
+
     if (!response.ok) {
-      const code = classifyHttpError(response.status);
-      let body = "";
-      try {
-        body = await response.text();
-      } catch {
-        /* ignora */
-      }
-      throw new ApiError(
-        code,
-        response.status,
-        `HTTP ${response.status}: ${body}`,
-      );
+      console.warn(`[BIBLIAAPI] HTTP ${response.status}\n${body.slice(0, 400)}`);
+      const code =
+        response.status === 401 || response.status === 403 ? 'UNAUTHORIZED' :
+        response.status === 404 ? 'NOT_FOUND' :
+        response.status === 429 ? 'RATE_LIMIT' : 'SERVER_ERROR';
+      throw new ApiError(code, response.status, `HTTP ${response.status}: ${body.slice(0,300)}`);
     }
 
-    // Parse JSON
-    let json: unknown;
     try {
-      json = await response.json();
-    } catch (parseError) {
-      throw new ApiError(
-        "INVALID_RESPONSE",
-        response.status,
-        "Falha ao interpretar a resposta JSON da API.",
-        parseError,
-      );
+      return JSON.parse(body) as T;
+    } catch {
+      throw new ApiError('INVALID_RESPONSE', response.status, 'JSON inválido');
     }
 
-    return json as T;
   } catch (error) {
     clearTimeout(timeoutId);
 
-    // Erro de timeout (AbortController)
-    if (error instanceof Error && error.name === "AbortError") {
-      const apiErr = new ApiError(
-        "TIMEOUT",
-        0,
-        `Requisição excedeu ${API_REQUEST_TIMEOUT_MS}ms: ${endpoint}`,
-      );
-
-      if (attempt < API_MAX_RETRIES) {
-        await delay(API_RETRY_BASE_DELAY_MS * Math.pow(2, attempt));
-        return request<T>(endpoint, attempt + 1);
-      }
-      throw apiErr;
+    if (error instanceof Error && error.name === 'AbortError') {
+      const e = new ApiError('TIMEOUT', 0, `Timeout após ${API_REQUEST_TIMEOUT_MS}ms`);
+      if (attempt < API_MAX_RETRIES) { await delay(API_RETRY_BASE_DELAY_MS * 2**attempt); return request<T>(endpoint, attempt+1); }
+      throw e;
     }
 
-    // Propaga ApiError sem retry (4xx são definitivos)
     if (error instanceof ApiError) {
       if (error.isNetworkRelated && attempt < API_MAX_RETRIES) {
-        await delay(API_RETRY_BASE_DELAY_MS * Math.pow(2, attempt));
-        return request<T>(endpoint, attempt + 1);
+        await delay(API_RETRY_BASE_DELAY_MS * 2**attempt); return request<T>(endpoint, attempt+1);
       }
       throw error;
     }
 
-    // Erro genérico de rede (fetch falhou antes de obter resposta)
-    const networkErr = new ApiError(
-      "NETWORK_ERROR",
-      0,
-      "Falha de rede ao conectar à BIBLIAAPI.",
-      error,
-    );
-
-    if (attempt < API_MAX_RETRIES) {
-      await delay(API_RETRY_BASE_DELAY_MS * Math.pow(2, attempt));
-      return request<T>(endpoint, attempt + 1);
-    }
-    throw networkErr;
+    const e = new ApiError('NETWORK_ERROR', 0,
+      `Falha: ${error instanceof Error ? error.message : String(error)}`, error);
+    if (attempt < API_MAX_RETRIES) { await delay(API_RETRY_BASE_DELAY_MS * 2**attempt); return request<T>(endpoint, attempt+1); }
+    throw e;
   }
 }
 
-// ─────────────────────────────────────────────
-// CLIENTE PÚBLICO
-// ─────────────────────────────────────────────
+// ─── Cliente público ──────────────────────────
 
 export const BibleApiClient = {
-  // ── Versões ──────────────────────────────────
 
-  /**
-   * Lista todas as versões bíblicas disponíveis na API.
-   * Ex: ACF, NVI, ARA, NAA
-   */
   async getVersions(): Promise<ApiVersionItem[]> {
     return request<ApiVersionItem[]>(Endpoints.versions());
   },
 
-  // ── Livros ───────────────────────────────────
-
-  /**
-   * Lista todos os 66 livros de uma versão com metadados.
-   * Resultado é estável — pode ser cacheado por longa duração.
-   */
-  async getBooks(version: string): Promise<ApiBookListItem[]> {
-    return request<ApiBookListItem[]>(Endpoints.books(version));
+  async getBooks(): Promise<ApiBookListItem[]> {
+    return request<ApiBookListItem[]>(Endpoints.books());
   },
 
-  // ── Capítulos de um Livro ────────────────────
-
-  /**
-   * Lista os capítulos disponíveis de um livro.
-   * Retorna metadados sem o texto dos versículos.
-   */
-  async getChapters(
-    version: string,
-    bookSlug: string,
-  ): Promise<{ number: number; verses: number }[]> {
-    return request<{ number: number; verses: number }[]>(
-      Endpoints.chapters(version, bookSlug),
+  async getChapterVerses(version: string, bookSlug: string, chapter: number): Promise<ApiChapterResponse> {
+    const raw = await request<unknown>(
+      Endpoints.chapterFull(toApiVersion(version), toAbbrev(bookSlug), chapter),
     );
+    return normalizeChapterResponse(raw);
   },
 
-  // ── Versículos de um Capítulo ────────────────
-
-  /**
-   * Busca todos os versículos de um capítulo.
-   * É o endpoint mais chamado no app — todo acesso passa pelo CacheManager.
-   *
-   * @param version  Código da versão bíblica: 'acf' | 'nvi' | 'ara' | 'naa'
-   * @param bookSlug Slug do livro conforme BIBLIAAPI: 'gn', 'jo', 'rm', etc.
-   * @param chapter  Número do capítulo (1-indexed)
-   */
-  async getChapterVerses(
-    version: string,
-    bookSlug: string,
-    chapter: number,
-  ): Promise<ApiChapterResponse> {
-    return request<ApiChapterResponse>(
-      Endpoints.chapterVerses(version, bookSlug, chapter),
-    );
-  },
-
-  // ── Versículo Individual ─────────────────────
-
-  /**
-   * Busca um versículo específico.
-   * Usado em preview de favoritos e compartilhamento.
-   */
-  async getVerse(
-    version: string,
-    bookSlug: string,
-    chapter: number,
-    verse: number,
-  ): Promise<ApiVerseResponse> {
+  async getVerse(version: string, bookSlug: string, chapter: number, verse: number): Promise<ApiVerseResponse> {
     return request<ApiVerseResponse>(
-      Endpoints.verse(version, bookSlug, chapter, verse),
+      Endpoints.verse(toApiVersion(version), toAbbrev(bookSlug), chapter, verse),
     );
   },
 
-  // ── Busca ────────────────────────────────────
-
-  /**
-   * Busca versículos por palavra-chave, tema ou expressão.
-   *
-   * @param query   Termo de busca (ex: "fé", "Espírito Santo", "nova aliança")
-   * @param version Versão bíblica para filtrar os resultados
-   */
-  async search(query: string, version: string): Promise<ApiSearchResponse> {
-    if (!query.trim()) {
-      return { verses: [], occurrence: 0 };
-    }
-    return request<ApiSearchResponse>(Endpoints.search(query, version));
+  async getRandom(version: string): Promise<ApiVerseResponse> {
+    return request<ApiVerseResponse>(Endpoints.random(toApiVersion(version)));
   },
 
-  // ── Health Check ─────────────────────────────
+  async search(query: string, version: string): Promise<ApiSearchResponse> {
+    if (!query.trim()) return { verses: [], occurrence: 0 };
+    return request<ApiSearchResponse>(Endpoints.search(query.trim(), toApiVersion(version)));
+  },
 
-  /**
-   * Verifica se a API está acessível e a chave é válida.
-   * Usar na tela de configurações para feedback ao usuário.
-   */
-  async healthCheck(): Promise<boolean> {
+  async healthCheck(): Promise<{ ok: boolean; detail?: string }> {
     try {
       await BibleApiClient.getVersions();
-      return true;
-    } catch {
-      return false;
+      return { ok: true };
+    } catch (e) {
+      const err = e as ApiError;
+      return { ok: false, detail: `${err.code}: ${err.message}` };
     }
   },
+
 } as const;
