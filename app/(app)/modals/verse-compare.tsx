@@ -1,11 +1,9 @@
 /**
- * VERBUM — app/(app)/modals/verse-compare.tsx
+ * FIX 6 — app/(app)/modals/verse-compare.tsx
  *
- * COLE EM: app/(app)/modals/verse-compare.tsx
- *
- * FIX: O GET /versions estava quebrando o modal inteiro.
- * Solução: lista de versões conhecidas hardcoded como fallback.
- * A API /versions é tentada mas nunca bloqueia a tela se falhar.
+ * Adiciona filtro de versões por chips no topo.
+ * Por padrão todas estão selecionadas. O usuário pode desmarcar
+ * versões que não quer ver.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -17,97 +15,60 @@ import { useSafeAreaInsets }            from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons }       from '@expo/vector-icons';
 
-import { useTheme }       from '../../../src/context/ThemeContext';
-import { BibleApiClient } from '../../../src/api/bibliaApi';
-import { BIBLIA_API_BASE_URL } from '../../../src/api/endpoints';
+import { useTheme }                from '../../../src/context/ThemeContext';
+import { BibleApiClient }          from '../../../src/api/bibliaApi';
+import { BIBLIA_API_BASE_URL }     from '../../../src/api/endpoints';
 
-// ─────────────────────────────────────────────
-// VERSÕES CONHECIDAS DA BIBLIAAPI
-// Usadas como fallback se GET /versions falhar ou retornar formato inesperado.
-// Adicione ou remova conforme o seu plano.
-// ─────────────────────────────────────────────
+// ─── Versões conhecidas com metadados ────────
 
-const KNOWN_VERSIONS: VersionMeta[] = [
-  { code: 'ACF',  name: 'Almeida Corrigida Fiel',       color: '#8B6340' },
-  { code: 'NVI',  name: 'Nova Versão Internacional',     color: '#4A7C59' },
-  { code: 'ARA',  name: 'Almeida Revista e Atualizada',  color: '#4A5C8B' },
-  { code: 'NAA',  name: 'Nova Almeida Atualizada',       color: '#7A4A8B' },
-  { code: 'KJV',  name: 'King James Version',            color: '#8B4A4A' },
-  { code: 'BBE',  name: 'Bible in Basic English',        color: '#4A8B7A' },
+const KNOWN_VERSIONS = [
+  { code: 'ACF', name: 'Almeida Corrigida Fiel',      color: '#8B6340' },
+  { code: 'NVI', name: 'Nova Versão Internacional',    color: '#4A7C59' },
+  { code: 'ARA', name: 'Almeida Revista e Atualizada', color: '#4A5C8B' },
+  { code: 'NAA', name: 'Nova Almeida Atualizada',      color: '#7A4A8B' },
+  { code: 'KJV', name: 'King James Version',           color: '#8B4A4A' },
+  { code: 'BBE', name: 'Bible in Basic English',       color: '#4A8B7A' },
 ];
 
-interface VersionMeta {
-  code:  string;
-  name:  string;
-  color: string;
-}
-
-// ─────────────────────────────────────────────
-// RESULTADO POR VERSÃO
-// ─────────────────────────────────────────────
+type VersionMeta = typeof KNOWN_VERSIONS[number];
 
 interface VersionResult extends VersionMeta {
-  text:      string | null;
-  status:    'loading' | 'done' | 'error' | 'unavailable';
+  text:   string | null;
+  status: 'loading' | 'done' | 'error';
 }
-
-// ─────────────────────────────────────────────
-// BUSCA DE VERSÕES DISPONÍVEIS (com fallback)
-// ─────────────────────────────────────────────
 
 let _cachedVersions: VersionMeta[] | null = null;
 
 async function resolveVersions(): Promise<VersionMeta[]> {
   if (_cachedVersions) return _cachedVersions;
-
   try {
-    const raw = await fetch(`${BIBLIA_API_BASE_URL}/versions`, {
+    const res = await fetch(`${BIBLIA_API_BASE_URL}/versions`, {
       headers: {
         Authorization: `Bearer ${process.env.EXPO_PUBLIC_BIBLIA_API_KEY ?? ''}`,
         Accept: 'application/json',
       },
     });
-
-    if (!raw.ok) throw new Error(`HTTP ${raw.status}`);
-
-    const json = await raw.json();
-
-    // Extrai o array independente do formato de resposta
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
     const arr: unknown[] = Array.isArray(json)
       ? json
-      : Array.isArray(json?.data)
-        ? json.data
-        : [];
-
-    if (arr.length === 0) throw new Error('Array vazio');
-
-    // Mapeia para VersionMeta, usando KNOWN_VERSIONS para cores e nomes completos
+      : Array.isArray(json?.data) ? json.data : [];
+    if (arr.length === 0) throw new Error('Vazio');
     const knownMap = Object.fromEntries(KNOWN_VERSIONS.map(v => [v.code, v]));
-    const mapped: VersionMeta[] = arr
+    const mapped = arr
       .map((item: any) => {
-        const code = (item?.version ?? item?.code ?? item?.name ?? String(item))
-          .toUpperCase()
-          .trim();
-        return {
-          code,
-          name:  knownMap[code]?.name  ?? code,
-          color: knownMap[code]?.color ?? '#8B6340',
-        };
+        const code = (item?.version ?? item?.code ?? String(item)).toUpperCase().trim();
+        return knownMap[code] ?? { code, name: code, color: '#8B6340' };
       })
       .filter(v => v.code.length > 0);
-
     _cachedVersions = mapped.length > 0 ? mapped : KNOWN_VERSIONS;
-  } catch (e) {
-    console.warn('[VerseCompare] GET /versions falhou, usando lista hardcoded:', e);
+  } catch {
     _cachedVersions = KNOWN_VERSIONS;
   }
-
   return _cachedVersions;
 }
 
-// ─────────────────────────────────────────────
-// COMPONENTE PRINCIPAL
-// ─────────────────────────────────────────────
+// ─── Modal principal ─────────────────────────
 
 export default function VerseCompareModal() {
   const { tokens } = useTheme();
@@ -116,58 +77,51 @@ export default function VerseCompareModal() {
   const {
     bookSlug  = 'gn',
     bookName  = '',
-    chapter:  chParam = '1',
-    verse:    vParam  = '1',
+    chapter:  chParam    = '1',
+    verse:    vParam     = '1',
     reference = '',
   } = useLocalSearchParams<{
-    bookSlug:  string;
-    bookName:  string;
-    chapter:   string;
-    verse:     string;
-    reference: string;
+    bookSlug: string; bookName: string;
+    chapter: string; verse: string; reference: string;
   }>();
 
   const chapterNum = parseInt(chParam, 10) || 1;
   const verseNum   = parseInt(vParam,  10) || 1;
   const ref        = reference || `${String(bookName)} ${chapterNum}:${verseNum}`;
 
-  const [results, setResults] = useState<VersionResult[]>([]);
-  const [isBooting, setIsBooting] = useState(true);
+  const [allVersions,     setAllVersions]     = useState<VersionMeta[]>([]);
+  const [selectedCodes,   setSelectedCodes]   = useState<Set<string>>(new Set());
+  const [results,         setResults]         = useState<VersionResult[]>([]);
+  const [isBooting,       setIsBooting]       = useState(true);
 
-  // ── Inicializa e busca em paralelo ──────────
+  // ── Inicialização ───────────────────────────
 
   const fetchAll = useCallback(async () => {
     setIsBooting(true);
     setResults([]);
 
-    // 1. Descobre as versões (com fallback garantido)
     const versions = await resolveVersions();
+    setAllVersions(versions);
 
-    // 2. Inicializa todos os cards como "loading"
+    // Por padrão, todas selecionadas
+    setSelectedCodes(new Set(versions.map(v => v.code)));
+
     const initial: VersionResult[] = versions.map(v => ({
-      ...v,
-      text:   null,
-      status: 'loading',
+      ...v, text: null, status: 'loading',
     }));
     setResults(initial);
     setIsBooting(false);
 
-    // 3. Busca em paralelo — cada card atualiza individualmente
+    // Busca em paralelo
     versions.forEach(v => {
       BibleApiClient
         .getVerse(v.code, String(bookSlug), chapterNum, verseNum)
         .then(res => {
-          // Extrai o texto de forma defensiva
-          const raw = res as any;
-          const text: string =
-            raw?.text    ??
-            raw?.verse?.text ??
-            raw?.data?.text  ??
-            '';
-
+          const raw  = res as any;
+          const text: string = raw?.text ?? raw?.verse?.text ?? raw?.data?.text ?? '';
           setResults(prev => prev.map(r =>
             r.code === v.code
-              ? { ...r, text: text || null, status: text ? 'done' : 'unavailable' }
+              ? { ...r, text: text || null, status: text ? 'done' : 'error' }
               : r,
           ));
         })
@@ -181,13 +135,34 @@ export default function VerseCompareModal() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // ── Métricas ─────────────────────────────────
+  // ── Toggle de versão ────────────────────────
 
-  const done        = results.filter(r => r.status === 'done');
-  const loading     = results.filter(r => r.status === 'loading');
-  const unavailable = results.filter(r => r.status === 'error' || r.status === 'unavailable');
+  const toggleVersion = (code: string) => {
+    setSelectedCodes(prev => {
+      const next = new Set(prev);
+      if (next.has(code)) {
+        // Impede desmarcar a última selecionada
+        if (next.size === 1) return prev;
+        next.delete(code);
+      } else {
+        next.add(code);
+      }
+      return next;
+    });
+  };
 
-  // ── Compartilhar ─────────────────────────────
+  const selectAll = () => {
+    setSelectedCodes(new Set(allVersions.map(v => v.code)));
+  };
+
+  // ── Resultados filtrados ─────────────────────
+
+  const filtered = results.filter(r =>
+    selectedCodes.has(r.code) && r.status !== 'error',
+  );
+
+  const doneCount    = filtered.filter(r => r.status === 'done').length;
+  const loadingCount = filtered.filter(r => r.status === 'loading').length;
 
   const shareVerse = async (version: string, text: string) => {
     await Share.share({
@@ -213,18 +188,12 @@ export default function VerseCompareModal() {
         <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
           <MaterialCommunityIcons name="close" size={22} color={tokens.iconPrimary} />
         </TouchableOpacity>
-
         <View style={{ flex: 1 }}>
-          <Text style={{
-            fontSize: 16, fontWeight: '700', color: tokens.textPrimary,
-          }}>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: tokens.textPrimary }}>
             Comparar versões
           </Text>
-          <Text style={{ fontSize: 13, color: tokens.textTertiary }}>
-            {ref}
-          </Text>
+          <Text style={{ fontSize: 13, color: tokens.textTertiary }}>{ref}</Text>
         </View>
-
         <TouchableOpacity
           onPress={() => { _cachedVersions = null; fetchAll(); }}
           style={{ padding: 4 }}
@@ -233,177 +202,188 @@ export default function VerseCompareModal() {
         </TouchableOpacity>
       </View>
 
-      {/* Carregando lista de versões */}
       {isBooting ? (
-        <View style={{
-          flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14,
-        }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 }}>
           <ActivityIndicator size="large" color={tokens.actionPrimary} />
           <Text style={{ fontSize: 14, color: tokens.textTertiary }}>
             Preparando versões…
           </Text>
         </View>
-
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            padding: 16,
-            gap: 14,
             paddingBottom: insets.bottom + 40,
           }}
         >
-          {/* Status geral */}
-          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
-            {loading.length > 0 && (
-              <View style={{
-                flexDirection: 'row', alignItems: 'center', gap: 6,
-                backgroundColor: tokens.bgCard, borderRadius: 20,
-                paddingVertical: 5, paddingHorizontal: 12,
-                borderWidth: 1, borderColor: tokens.borderLight,
+          {/* ── FIX 6: Filtro de versões ─────────── */}
+          <View style={{ padding: 16, gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{
+                fontSize: 12, fontWeight: '600', color: tokens.textTertiary,
+                textTransform: 'uppercase', letterSpacing: 0.8, flex: 1,
               }}>
-                <ActivityIndicator size="small" color={tokens.actionPrimary} />
-                <Text style={{ fontSize: 12, color: tokens.textTertiary }}>
-                  {loading.length} carregando…
-                </Text>
-              </View>
-            )}
-            {done.length > 0 && (
-              <View style={{
-                flexDirection: 'row', alignItems: 'center', gap: 6,
-                backgroundColor: tokens.successBg, borderRadius: 20,
-                paddingVertical: 5, paddingHorizontal: 12,
-              }}>
-                <MaterialCommunityIcons name="check" size={14} color={tokens.success} />
-                <Text style={{ fontSize: 12, color: tokens.success, fontWeight: '600' }}>
-                  {done.length} carregadas
-                </Text>
-              </View>
-            )}
+                Filtrar versões
+              </Text>
+              {selectedCodes.size < allVersions.length && (
+                <TouchableOpacity onPress={selectAll}>
+                  <Text style={{ fontSize: 12, color: tokens.actionPrimary }}>
+                    Selecionar todas
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8 }}
+            >
+              {allVersions.map(v => {
+                const selected = selectedCodes.has(v.code);
+                const result   = results.find(r => r.code === v.code);
+                const isLoading = result?.status === 'loading';
+
+                return (
+                  <TouchableOpacity
+                    key={v.code}
+                    onPress={() => toggleVersion(v.code)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingVertical: 8,
+                      paddingHorizontal: 14,
+                      borderRadius: 20,
+                      backgroundColor: selected ? v.color : tokens.bgCard,
+                      borderWidth: 1.5,
+                      borderColor: selected ? v.color : tokens.borderLight,
+                      gap: 6,
+                    }}
+                  >
+                    {isLoading && selected && (
+                      <ActivityIndicator size="small" color="white" />
+                    )}
+                    {!isLoading && (
+                      <MaterialCommunityIcons
+                        name={selected ? 'check-circle' : 'circle-outline'}
+                        size={14}
+                        color={selected ? 'white' : tokens.iconMuted}
+                      />
+                    )}
+                    <Text style={{
+                      fontSize: 13,
+                      fontWeight: '700',
+                      color: selected ? 'white' : tokens.textSecondary,
+                      letterSpacing: 0.5,
+                    }}>
+                      {v.code}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Status */}
+            <Text style={{ fontSize: 11, color: tokens.textDisabled }}>
+              {selectedCodes.size} versão{selectedCodes.size !== 1 ? 'ões' : ''} selecionada{selectedCodes.size !== 1 ? 's' : ''}
+              {loadingCount > 0 ? ` · ${loadingCount} carregando…` : ''}
+              {doneCount > 0 ? ` · ${doneCount} pronta${doneCount !== 1 ? 's' : ''}` : ''}
+            </Text>
           </View>
 
-          {/* Cartões */}
-          {results
-            .filter(r => r.status !== 'error' && r.status !== 'unavailable')
-            .map(result => (
+          {/* ── Cartões de versão ─────────────────── */}
+          <View style={{ paddingHorizontal: 16, gap: 14 }}>
+            {filtered.map(result => (
               <VersionCard
                 key={result.code}
                 result={result}
                 reference={ref}
                 onShare={() => result.text && shareVerse(result.code, result.text)}
               />
-            ))
-          }
+            ))}
 
-          {/* Indisponíveis */}
-          {unavailable.length > 0 && (
-            <View style={{
-              backgroundColor: tokens.bgSecondary,
-              borderRadius: 12,
-              padding: 14,
-              borderWidth: 1,
-              borderColor: tokens.borderLight,
-            }}>
-              <Text style={{
-                fontSize: 12, color: tokens.textDisabled, textAlign: 'center',
-              }}>
-                Não disponível em:{' '}
-                {unavailable.map(r => r.code).join(', ')}
-              </Text>
-            </View>
-          )}
+            {filtered.length === 0 && !isBooting && (
+              <View style={{ alignItems: 'center', padding: 32, gap: 12 }}>
+                <MaterialCommunityIcons
+                  name="filter-remove-outline"
+                  size={48}
+                  color={tokens.iconMuted}
+                />
+                <Text style={{ fontSize: 15, color: tokens.textTertiary, textAlign: 'center' }}>
+                  Nenhuma versão selecionada.{'\n'}
+                  Toque nos chips acima para selecionar.
+                </Text>
+              </View>
+            )}
+          </View>
         </ScrollView>
       )}
     </View>
   );
 }
 
-// ─────────────────────────────────────────────
-// CARTÃO DE VERSÃO
-// ─────────────────────────────────────────────
+// ─── Cartão individual ───────────────────────
 
 function VersionCard({
-  result,
-  reference,
-  onShare,
+  result, reference, onShare,
 }: {
   result:    VersionResult;
   reference: string;
   onShare:   () => void;
 }) {
   const { tokens } = useTheme();
-  const { code, name, color, text, status } = result;
 
   return (
     <View style={{
-      borderRadius: 16,
-      overflow: 'hidden',
-      borderWidth: 1,
-      borderColor: tokens.borderLight,
+      borderRadius: 16, overflow: 'hidden',
+      borderWidth: 1, borderColor: tokens.borderLight,
       backgroundColor: tokens.bgCard,
     }}>
-      {/* Faixa da versão */}
+      {/* Faixa */}
       <View style={{
-        backgroundColor: color,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        gap: 8,
+        backgroundColor: result.color,
+        flexDirection: 'row', alignItems: 'center',
+        paddingVertical: 10, paddingHorizontal: 16, gap: 8,
       }}>
         <MaterialCommunityIcons name="book-open-variant" size={16} color="white" />
-        <Text style={{
-          fontSize: 13, fontWeight: '700', color: 'white', letterSpacing: 1,
-        }}>
-          {code}
+        <Text style={{ fontSize: 13, fontWeight: '700', color: 'white', letterSpacing: 1 }}>
+          {result.code}
         </Text>
         <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', flex: 1 }}>
-          {name}
+          {result.name}
         </Text>
-        {status === 'done' && text && (
+        {result.status === 'done' && result.text && (
           <TouchableOpacity onPress={onShare} style={{ padding: 4 }}>
             <MaterialCommunityIcons name="share-variant-outline" size={18} color="white" />
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Conteúdo */}
+      {/* Texto */}
       <View style={{ padding: 18 }}>
-        {status === 'loading' ? (
+        {result.status === 'loading' ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <ActivityIndicator size="small" color={color} />
-            <Text style={{ fontSize: 13, color: tokens.textTertiary }}>
-              Carregando…
-            </Text>
+            <ActivityIndicator size="small" color={result.color} />
+            <Text style={{ fontSize: 13, color: tokens.textTertiary }}>Carregando…</Text>
           </View>
-
-        ) : status === 'done' && text ? (
+        ) : result.status === 'done' && result.text ? (
           <>
             <Text style={{
-              fontSize: 17,
-              lineHeight: 30,
-              color: tokens.textVerse,
-              fontFamily: 'serif',
-              fontStyle: 'italic',
+              fontSize: 17, lineHeight: 30, color: tokens.textVerse,
+              fontFamily: 'serif', fontStyle: 'italic',
             }}>
-             {`"${text}"`}
+             {`"${result.text}"`}
             </Text>
             <Text style={{
-              fontSize: 11,
-              color: tokens.textDisabled,
-              marginTop: 12,
-              textAlign: 'right',
-              letterSpacing: 0.3,
+              fontSize: 11, color: tokens.textDisabled,
+              marginTop: 12, textAlign: 'right',
             }}>
-              {reference} · {code}
+              {reference} · {result.code}
             </Text>
           </>
-
         ) : (
-          <Text style={{
-            fontSize: 13, color: tokens.textDisabled, fontStyle: 'italic',
-          }}>
-            Versículo não encontrado nesta versão.
+          <Text style={{ fontSize: 13, color: tokens.textDisabled, fontStyle: 'italic' }}>
+            Não disponível nesta versão.
           </Text>
         )}
       </View>

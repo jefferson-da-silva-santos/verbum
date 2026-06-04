@@ -33,7 +33,6 @@ import {
 import type {
   ReadingPlan,
   PlanScheduleEntry,
-  CreateChapterProgressInput,
 } from '../database/types';
 import type { Achievement } from '../constants/achievements';
 import {
@@ -43,7 +42,6 @@ import {
   AchievementChecker,
 } from '../engine';
 import type { PlanInput } from '../engine/PlanCalculator';
-import { buildChapterQueue } from '../constants/bible';
 import { todayIso } from '../engine/dateHelpers';
 
 // ─────────────────────────────────────────────
@@ -219,51 +217,75 @@ export function PlanProvider({ children }: { children: ReactNode }) {
   const markChapterRead = useCallback(async (
     bookSlug: string,
     bookName: string,
-    chapter: number,
+    chapter:  number,
   ) => {
-    if (!activePlan || !user) return;
-
+    if (!user) return;
+ 
     const chapterId = `${bookSlug}-${chapter}`;
-    if (readChapterIds.has(chapterId)) return; // já lido
-
+ 
+    // ── FIX 3: verifica escopo do plano ────────────────────────────────────
+    // Extrai os slugs do plano ativo (se existir)
+    let planSlugs: string[] = [];
+    if (activePlan) {
+      const scope = activePlan.scopeData as any;
+      if (scope?.type === 'books' && Array.isArray(scope.bookSlugs)) {
+        planSlugs = scope.bookSlugs;
+      } else if (scope?.type === 'book' && scope.bookSlug) {
+        planSlugs = [scope.bookSlug];
+      }
+      // full_bible / testament / preset: planSlugs vazio = tudo conta
+    }
+ 
+    const isInPlanScope =
+      !activePlan ||                          // sem plano ativo: registra globalmente
+      planSlugs.length === 0 ||              // full_bible: tudo conta
+      planSlugs.includes(bookSlug);          // livro pertence ao plano
+ 
+    // planId só é atribuído se o capítulo pertence ao plano
+    const planIdToSave = isInPlanScope && activePlan ? activePlan.id : null;
+ 
+    // Se já foi lido para ESTE plano, não duplica
+    if (isInPlanScope && readChapterIds.has(chapterId)) return;
+ 
     const today = todayIso();
-
-    // 1. Persistir no banco
+ 
     await progressRepo.markChapterRead({
-      planId: activePlan.id,
-      userId: user.id,
+      planId:                   planIdToSave,
+      userId:                   user.id,
       bookSlug,
       bookName,
-      chapterNumber: chapter,
-      readAt: new Date().toISOString(),
-      readingDurationSeconds: null, // será atualizado ao encerrar a sessão
-      scheduleDate: todaySchedule?.date ?? today,
-      isOnTime: todaySchedule?.date === today,
-    } satisfies CreateChapterProgressInput);
-
-    // 2. Atualizar estado local (otimista — UI responde imediatamente)
-    const newReadIds = new Set(readChapterIds);
-    newReadIds.add(chapterId);
-    if (mounted.current) setReadChapterIds(newReadIds);
-
-    // 3. Verificar se o plano está completo
-    if (newReadIds.size >= activePlan.totalChapters) {
-      await planRepo.markCompleted(activePlan.id);
-      if (mounted.current) {
-        setActivePlan_((prev) => prev ? { ...prev, isCompleted: true } : null);
+      chapterNumber:            chapter,
+      readAt:                   new Date().toISOString(),
+      readingDurationSeconds:   null,
+      scheduleDate:             todaySchedule?.date ?? today,
+      isOnTime:                 todaySchedule?.date === today,
+    });
+ 
+    // Atualiza estado local apenas se pertence ao plano
+    if (isInPlanScope && activePlan) {
+      const newReadIds = new Set(readChapterIds);
+      newReadIds.add(chapterId);
+      if (mounted.current) setReadChapterIds(newReadIds);
+ 
+      // Verifica conclusão do plano
+      if (newReadIds.size >= activePlan.totalChapters) {
+        await planRepo.markCompleted(activePlan.id);
+        if (mounted.current) {
+          setActivePlan_((prev) => prev ? { ...prev, isCompleted: true } : null);
+        }
       }
-    }
-
-    // 4. Verificar conquistas (em background — não bloqueia a UI)
-    _checkAchievements(user.id, newReadIds).catch(
-      (e) => console.warn('[PlanContext] Erro ao verificar conquistas:', e),
-    );
-
-    // 5. Verificar se recalibração é necessária (a cada 5 capítulos)
-    if (newReadIds.size % 5 === 0 && !activePlan.isCompleted) {
-      _maybeRecalibrate(activePlan, newReadIds, user.id).catch(
-        (e) => console.warn('[PlanContext] Erro ao recalibrar:', e),
+ 
+      // Verifica conquistas em background
+      _checkAchievements(user.id, newReadIds).catch(
+        (e) => console.warn('[PlanContext] Erro ao verificar conquistas:', e),
       );
+ 
+      // Recalibração a cada 5 capítulos
+      if (newReadIds.size % 5 === 0 && !activePlan.isCompleted) {
+        _maybeRecalibrate(activePlan, newReadIds, user.id).catch(
+          (e) => console.warn('[PlanContext] Erro ao recalibrar:', e),
+        );
+      }
     }
   }, [activePlan, user, readChapterIds, todaySchedule]);
 

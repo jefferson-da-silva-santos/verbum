@@ -95,7 +95,7 @@ export interface PlanScheduleEntry {
 
 export interface ChapterProgress {
   id: string;
-  planId: string;
+  planId: string | null;
   userId: string;
   bookSlug: string;
   bookName: string;

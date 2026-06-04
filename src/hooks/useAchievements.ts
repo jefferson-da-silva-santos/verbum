@@ -47,6 +47,7 @@ export interface UseAchievementsReturn {
   isLoading: boolean;
   error: Error | null;
   refresh: () => Promise<void>;
+  unlockedKeys: ReadonlySet<string> | undefined;
 }
 
 export function useAchievements(): UseAchievementsReturn {
@@ -125,6 +126,7 @@ export function useAchievements(): UseAchievementsReturn {
     totalCount: TOTAL_PUBLIC_ACHIEVEMENTS,
     progressPercent,
     isLoading,
+    unlockedKeys,
     error,
     refresh: fetch,
   };
