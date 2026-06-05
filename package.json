@@ -16,6 +16,7 @@
     "expo": "~54.0.35",
     "expo-file-system": "~18.0.0",
     "expo-font": "~13.0.0",
+    "expo-keep-awake": "~15.0.8",
     "expo-notifications": "~0.29.0",
     "expo-print": "~13.0.0",
     "expo-router": "~6.0.0",

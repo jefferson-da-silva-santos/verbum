@@ -298,3 +298,148 @@ export interface SessionStats {
   avgDurationSeconds: number;
   totalChaptersRead: number;
 }
+
+/**
+ * VERBUM — src/database/featureTypes.ts
+ *
+ * Tipos TypeScript para as features avançadas.
+ * Adicionar no arquivo src/database/types.ts existente.
+ */
+
+// ─── CADERNO DO PREGADOR ──────────────────────────────────────────────
+
+export type SermonStatus = 'draft' | 'ready' | 'preached';
+
+export interface SermonOutlinePoint {
+  id:           string;
+  point:        string;
+  subpoints?:   string[];
+  illustration?: string;
+}
+
+export interface Sermon {
+  id:               string;
+  userId:           string;
+  title:            string;
+  passageRef:       string | null;
+  bookSlug:         string | null;
+  chapterStart:     number | null;
+  verseStart:       number | null;
+  chapterEnd:       number | null;
+  verseEnd:         number | null;
+  contextNotes:     string | null;
+  structureNotes:   string | null;
+  exegesisNotes:    string | null;
+  outline:          SermonOutlinePoint[] | null;
+  applicationNotes: string | null;
+  status:           SermonStatus;
+  preachedAt:       string | null;
+  createdAt:        string;
+  updatedAt:        string;
+}
+
+export interface SermonVerse {
+  id:           string;
+  sermonId:     string;
+  bookSlug:     string;
+  bookName:     string;
+  chapter:      number;
+  verse:        number;
+  verseText:    string | null;
+  sectionLabel: string | null;
+  sortOrder:    number;
+  createdAt:    string;
+}
+
+export interface SermonWithVerses extends Sermon {
+  verses: SermonVerse[];
+}
+
+// ─── MAPA TEMÁTICO ───────────────────────────────────────────────────
+
+export type MapConnectionType =
+  | 'tipo'
+  | 'profecia'
+  | 'cumprimento'
+  | 'paralelo'
+  | 'referencia'
+  | 'contraste';
+
+export interface ThematicMap {
+  id:          string;
+  userId:      string;
+  name:        string;
+  description: string | null;
+  color:       string;
+  createdAt:   string;
+  updatedAt:   string;
+}
+
+export interface ThematicMapVerse {
+  id:             string;
+  mapId:          string;
+  bookSlug:       string;
+  bookName:       string;
+  chapter:        number;
+  verse:          number;
+  verseText:      string | null;
+  connectionType: MapConnectionType;
+  note:           string | null;
+  sortOrder:      number;
+  createdAt:      string;
+}
+
+export interface ThematicMapWithVerses extends ThematicMap {
+  verses: ThematicMapVerse[];
+}
+
+// ─── EXPOSIÇÃO GUIADA (COIA) ─────────────────────────────────────────
+
+export interface StudyNote {
+  id:             string;
+  userId:         string;
+  bookSlug:       string;
+  bookName:       string;
+  chapter:        number;
+  verseStart:     number | null;
+  verseEnd:       number | null;
+  passageRef:     string;
+  context:        string | null;
+  observation:    string | null;
+  interpretation: string | null;
+  application:    string | null;
+  createdAt:      string;
+  updatedAt:      string;
+}
+
+// ─── HELPERS ────────────────────────────────────────────────────────
+
+export const MAP_CONNECTION_LABELS: Record<MapConnectionType, string> = {
+  tipo:         'Tipo / Prefigura',
+  profecia:     'Profecia',
+  cumprimento:  'Cumprimento',
+  paralelo:     'Paralelo',
+  referencia:   'Referência',
+  contraste:    'Contraste',
+};
+
+export const MAP_CONNECTION_COLORS: Record<MapConnectionType, string> = {
+  tipo:         '#8B6340',
+  profecia:     '#4A5C8B',
+  cumprimento:  '#4A7C59',
+  paralelo:     '#7A4A8B',
+  referencia:   '#5A8B7A',
+  contraste:    '#8B4A4A',
+};
+
+export const SERMON_STATUS_LABELS: Record<SermonStatus, string> = {
+  draft:    'Rascunho',
+  ready:    'Pronto',
+  preached: 'Pregado',
+};
+
+export const SERMON_STATUS_COLORS: Record<SermonStatus, string> = {
+  draft:    '#8B6340',
+  ready:    '#4A7C59',
+  preached: '#4A5C8B',
+};
