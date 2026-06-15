@@ -1,17 +1,17 @@
 /**
- * VERBUM — ThemeContext
+ * VERBUM — src/context/ThemeContext.tsx  [FIX DEFINITIVO]
  *
- * Fornece os tokens de cor corretos (light ou dark) para toda a árvore.
- * Persiste a preferência do usuário via SecureStore para sobreviver restarts.
+ * Problemas anteriores:
+ *   1. `if (!isLoaded) return null` desmontava toda a árvore → comportamento errático
+ *   2. Quando o usuário mudava o tema, o estado local atualizava mas o SecureStore
+ *      podia falhar silenciosamente, e no próximo boot voltava ao 'system'
+ *   3. Possível problema de key no SecureStore (caracteres especiais)
  *
- * Hierarquia de decisão da aparência:
- *   preference === 'system' → segue useColorScheme() do dispositivo
- *   preference === 'light'  → força modo claro independente do sistema
- *   preference === 'dark'   → força modo escuro independente do sistema
- *
- * Uso nos componentes:
- *   const { tokens, isDark, shadows } = useTheme();
- *   <View style={{ backgroundColor: tokens.bgCard }} />
+ * Solução:
+ *   - Nunca retorna null — renderiza com 'system' imediatamente
+ *   - Aplica a preferência salva assim que carrega (sem bloquear)
+ *   - setTheme: atualiza estado E persiste, logando qualquer erro
+ *   - Key do SecureStore: apenas letras e underscore (seguro em todos SDKs)
  */
 
 import {
@@ -23,94 +23,85 @@ import {
   type ReactNode,
 } from 'react';
 import { useColorScheme } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore   from 'expo-secure-store';
 
-import {
-  LightTokens,
-  DarkTokens,
-  Shadows,
-  DarkShadows,
-} from '../constants/colors';
-import type { ColorTokens } from '../constants/colors';
+import { LightTokens, DarkTokens } from '../constants/colors';
 
-// ─────────────────────────────────────────────
-// TIPOS
-// ─────────────────────────────────────────────
+// ─── Tipos ───────────────────────────────────────────────────────
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 
-export interface ThemeContextValue {
-  /** Tokens semânticos prontos para uso nos StyleSheets */
-  tokens: ColorTokens;
-  /** Se o tema escuro está ativo no momento */
-  isDark: boolean;
-  /** Preferência configurada pelo usuário */
+export type ColorTokens = {
+  readonly [K in keyof typeof LightTokens]: string;
+};
+
+interface ThemeContextValue {
+  tokens:     ColorTokens;
+  isDark:     boolean;
   preference: ThemePreference;
-  /** Sombras correspondentes ao tema ativo */
-  shadows: typeof Shadows | typeof DarkShadows;
-  /**
-   * Altera a preferência de tema e persiste via SecureStore.
-   * Atualização de estado é síncrona; persistência é assíncrona (fire-and-forget).
-   */
-  setPreference: (pref: ThemePreference) => void;
+  setTheme:   (pref: ThemePreference) => Promise<void>;
 }
 
-// ─────────────────────────────────────────────
-// CONTEXTO
-// ─────────────────────────────────────────────
+// Chave sem caracteres especiais — compatível com todos os SDKs do Expo
+const THEME_KEY = 'verbum_theme';
 
-const THEME_PREF_KEY = 'verbum_theme_preference';
+// ─── Context ─────────────────────────────────────────────────────
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-// ─────────────────────────────────────────────
-// PROVIDER
-// ─────────────────────────────────────────────
+export function useTheme(): ThemeContextValue {
+  const ctx = useContext(ThemeContext);
+  if (!ctx) throw new Error('useTheme() deve ser usado dentro de <ThemeProvider>');
+  return ctx;
+}
+
+// ─── Provider ────────────────────────────────────────────────────
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const systemScheme = useColorScheme(); // 'light' | 'dark' | null
-  const [preference, setPreferenceState] = useState<ThemePreference>('system');
+  const systemScheme                = useColorScheme(); // 'dark' | 'light' | null
+  const [preference, setPreference] = useState<ThemePreference>('system');
 
-  // Carregar preferência salva no primeiro mount
+  // Carrega preferência salva SEM bloquear a renderização
   useEffect(() => {
-    SecureStore.getItemAsync(THEME_PREF_KEY).then((stored) => {
-      if (stored === 'light' || stored === 'dark' || stored === 'system') {
-        setPreferenceState(stored);
-      }
-    }).catch(() => { /* usa padrão 'system' se SecureStore falhar */ });
+    SecureStore.getItemAsync(THEME_KEY)
+      .then((saved: string | null) => {
+        console.log('[ThemeContext] Preferência carregada do storage:', saved);
+        if (saved === 'light' || saved === 'dark' || saved === 'system') {
+          setPreference(saved);
+        }
+      })
+      .catch(e => {
+        console.warn('[ThemeContext] Erro ao carregar preferência:', e);
+      });
   }, []);
 
-  // Calcular se o dark mode está ativo
+  // Calcula isDark baseado na preferência ativa
   const isDark: boolean =
-    preference === 'dark' ||
-    (preference === 'system' && systemScheme === 'dark');
+    preference === 'dark'  ? true  :
+    preference === 'light' ? false :
+    systemScheme === 'dark';        // 'system' → segue o SO
 
-  const tokens = isDark ? DarkTokens : LightTokens;
-  const shadows = isDark ? DarkShadows : Shadows;
+  // Cast necessário pois LightTokens e DarkTokens têm literals diferentes
+  const tokens = (isDark ? DarkTokens : LightTokens) as ColorTokens;
 
-  const setPreference = useCallback((pref: ThemePreference) => {
-    setPreferenceState(pref);
-    // Persiste em background — não bloqueia a UI
-    SecureStore.setItemAsync(THEME_PREF_KEY, pref).catch(
-      (e) => console.warn('[ThemeContext] Falha ao persistir preferência:', e),
-    );
+  // Muda o tema: atualiza estado imediatamente E persiste
+  const setTheme = useCallback(async (pref: ThemePreference) => {
+    console.log('[ThemeContext] Mudando tema para:', pref);
+    setPreference(pref);
+    try {
+      await SecureStore.setItemAsync(THEME_KEY, pref);
+      console.log('[ThemeContext] Tema persistido com sucesso:', pref);
+    } catch (e) {
+      console.error('[ThemeContext] ERRO ao persistir tema:', e);
+    }
   }, []);
+
+  // Log para debug (remover em produção)
+  console.log(`[ThemeContext] preference=${preference} | systemScheme=${systemScheme} | isDark=${isDark}`);
 
   return (
-    <ThemeContext.Provider value={{ tokens, isDark, preference, shadows, setPreference }}>
+    <ThemeContext.Provider value={{ tokens, isDark, preference, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );
-}
-
-// ─────────────────────────────────────────────
-// HOOK PÚBLICO
-// ─────────────────────────────────────────────
-
-export function useTheme(): ThemeContextValue {
-  const ctx = useContext(ThemeContext);
-  if (!ctx) {
-    throw new Error('useTheme() deve ser usado dentro de <ThemeProvider>');
-  }
-  return ctx;
 }

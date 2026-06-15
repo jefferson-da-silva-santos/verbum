@@ -1,19 +1,11 @@
 /**
- * VERBUM — AuthContext
+ * VERBUM — src/context/AuthContext.tsx  [CORRIGIDO]
  *
- * Gerencia a sessão do usuário autenticado localmente.
+ * Fix 1: register não passa avatarUrl/preferredVersion para userRepo.create()
+ *         pois create() só aceita { name, email } — defaults são internos ao repo.
  *
- * Fluxo de autenticação (MVP local — sem backend):
- *   register → cria perfil no SQLite → persiste userId no SecureStore
- *   login    → busca por email no SQLite → persiste userId no SecureStore
- *   logout   → remove userId do SecureStore → limpa estado
- *
- * Na abertura do app o contexto lê o userId salvo, carrega o User do SQLite
- * e restaura a sessão automaticamente sem exibir a tela de login.
- *
- * Expansão futura: a interface está desenhada para adicionar autenticação
- * remota (JWT, OAuth) sem alterar os consumers — apenas a implementação
- * interna de login/register muda.
+ * Fix 2: updateProfile não usa o retorno de userRepo.update() (que é void).
+ *         Em vez disso, recarrega o usuário com findById após o update.
  */
 
 import {
@@ -26,18 +18,17 @@ import {
 } from 'react';
 import * as SecureStore from 'expo-secure-store';
 
-import { userRepo } from '../database/repositories';
-import type { User, CreateUserInput, UpdateUserInput } from '../database/types';
-import { DEFAULT_MINUTES_PER_CHAPTER, DEFAULT_BIBLE_VERSION } from '../constants/bible';
+import { userRepo }      from '../database/repositories';
+import type { User, UpdateUserInput } from '../database/types';
 
-// ─────────────────────────────────────────────
-// TIPOS
-// ─────────────────────────────────────────────
+// ─── Constantes ─────────────────────────────────────────────────────
 
 const SESSION_KEY = 'verbum_user_id';
 
+// ─── Tipos ──────────────────────────────────────────────────────────
+
 export interface RegisterInput {
-  name: string;
+  name:  string;
   email: string;
 }
 
@@ -47,54 +38,47 @@ type AuthState =
   | { status: 'authenticated'; user: User };
 
 type AuthAction =
-  | { type: 'LOADING' }
-  | { type: 'SET_USER'; user: User }
+  | { type: 'LOADING'   }
+  | { type: 'SET_USER';  user: User }
   | { type: 'CLEAR_USER' };
 
 export interface AuthContextValue {
-  /** Usuário autenticado — null se não autenticado */
-  user: User | null;
-  /** true durante o carregamento inicial da sessão */
-  isLoading: boolean;
+  user:            User | null;
+  isLoading:       boolean;
   isAuthenticated: boolean;
-  /** Cria um novo perfil e inicia a sessão */
-  register: (input: RegisterInput) => Promise<void>;
-  /** Autentica com email (MVP local — sem senha) */
-  login: (email: string) => Promise<void>;
-  /** Encerra a sessão e limpa o SecureStore */
-  logout: () => Promise<void>;
-  /** Atualiza campos do perfil e refresca o estado */
-  updateProfile: (input: UpdateUserInput) => Promise<void>;
-  /** Sincroniza o estado local após update externo (ex: settings) */
-  refreshUser: () => Promise<void>;
+  register:        (input: RegisterInput)    => Promise<void>;
+  login:           (email: string)           => Promise<void>;
+  logout:          ()                        => Promise<void>;
+  updateProfile:   (input: UpdateUserInput)  => Promise<void>;
+  refreshUser:     ()                        => Promise<void>;
 }
 
-// ─────────────────────────────────────────────
-// REDUCER
-// ─────────────────────────────────────────────
+// ─── Reducer ────────────────────────────────────────────────────────
 
 function authReducer(state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
-    case 'LOADING': return { status: 'loading' };
-    case 'SET_USER': return { status: 'authenticated', user: action.user };
+    case 'LOADING':    return { status: 'loading' };
+    case 'SET_USER':   return { status: 'authenticated', user: action.user };
     case 'CLEAR_USER': return { status: 'unauthenticated' };
   }
 }
 
-// ─────────────────────────────────────────────
-// CONTEXTO
-// ─────────────────────────────────────────────
+// ─── Context ────────────────────────────────────────────────────────
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// ─────────────────────────────────────────────
-// PROVIDER
-// ─────────────────────────────────────────────
+export function useAuthContext(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuthContext() deve ser usado dentro de <AuthProvider>');
+  return ctx;
+}
+
+// ─── Provider ────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, { status: 'loading' });
 
-  // ── Restaurar sessão na abertura do app ──────
+  // ── Restaurar sessão na inicialização ───────────────────────────
 
   useEffect(() => {
     (async () => {
@@ -114,57 +98,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  // ── register ─────────────────────────────────
+  // ── register ────────────────────────────────────────────────────
 
   const register = useCallback(async (input: RegisterInput) => {
     const already = await userRepo.exists(input.email);
-    if (already) {
-      throw new Error('Este e-mail já está cadastrado.');
-    }
+    if (already) throw new Error('Este e-mail já está cadastrado neste dispositivo.');
 
+    // FIX 1: apenas name e email — todos os outros campos têm default no repo
     const newUser = await userRepo.create({
-      name: input.name,
-      email: input.email,
-      avatarUrl: null,
-      preferredVersion: DEFAULT_BIBLE_VERSION,
-      avgReadingSpeed: DEFAULT_MINUTES_PER_CHAPTER,
-      fontScale: 1.0,
-      darkModePreference: 'system',
-      notificationsEnabled: true,
-      reminderTime: null,
-    } satisfies CreateUserInput);
+      name:  input.name.trim(),
+      email: input.email.trim().toLowerCase(),
+    });
 
     await SecureStore.setItemAsync(SESSION_KEY, newUser.id);
     dispatch({ type: 'SET_USER', user: newUser });
   }, []);
 
-  // ── login ────────────────────────────────────
+  // ── login ───────────────────────────────────────────────────────
 
   const login = useCallback(async (email: string) => {
     const user = await userRepo.findByEmail(email.trim().toLowerCase());
-    if (!user) {
-      throw new Error('Nenhuma conta encontrada com este e-mail.');
-    }
+    if (!user) throw new Error('Nenhuma conta encontrada com este e-mail.');
     await SecureStore.setItemAsync(SESSION_KEY, user.id);
     dispatch({ type: 'SET_USER', user });
   }, []);
 
-  // ── logout ───────────────────────────────────
+  // ── logout ──────────────────────────────────────────────────────
 
   const logout = useCallback(async () => {
     await SecureStore.deleteItemAsync(SESSION_KEY);
     dispatch({ type: 'CLEAR_USER' });
   }, []);
 
-  // ── updateProfile ────────────────────────────
+  // ── updateProfile ────────────────────────────────────────────────
 
   const updateProfile = useCallback(async (input: UpdateUserInput) => {
-    if (state.status !== 'authenticated') return;
-    const updated = await userRepo.update(state.user.id, input);
-    dispatch({ type: 'SET_USER', user: updated });
+    if (state.status !== 'authenticated') {
+      console.warn('[AuthContext] updateProfile chamado sem usuário autenticado.');
+      return;
+    }
+
+    // FIX 2: update retorna void — recarrega o usuário depois
+    await userRepo.update(state.user.id, input);
+
+    const fresh = await userRepo.findById(state.user.id);
+    if (fresh) dispatch({ type: 'SET_USER', user: fresh });
   }, [state]);
 
-  // ── refreshUser ──────────────────────────────
+  // ── refreshUser ─────────────────────────────────────────────────
 
   const refreshUser = useCallback(async () => {
     if (state.status !== 'authenticated') return;
@@ -172,11 +153,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (fresh) dispatch({ type: 'SET_USER', user: fresh });
   }, [state]);
 
-  // ── Valor do contexto ────────────────────────
+  // ── Value ────────────────────────────────────────────────────────
 
   const value: AuthContextValue = {
-    user: state.status === 'authenticated' ? state.user : null,
-    isLoading: state.status === 'loading',
+    user:            state.status === 'authenticated' ? state.user : null,
+    isLoading:       state.status === 'loading',
     isAuthenticated: state.status === 'authenticated',
     register,
     login,
@@ -190,16 +171,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-// ─────────────────────────────────────────────
-// HOOK PÚBLICO
-// ─────────────────────────────────────────────
-
-export function useAuthContext(): AuthContextValue {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error('useAuthContext() deve ser usado dentro de <AuthProvider>');
-  }
-  return ctx;
 }

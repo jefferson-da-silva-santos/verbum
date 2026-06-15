@@ -1,362 +1,341 @@
 /**
- * VERBUM — Design Tokens: Colors
+ * VERBUM — src/constants/colors.ts  [REDESENHADO]
  *
- * Paleta baseada em marrom/pergaminho para transmitir identidade
- * de livro antigo, espiritualidade e sobriedade cristã conservadora.
+ * Nova identidade visual:
+ *   Light: fundo branco puro, texto escuro, detalhes em violeta/roxo
+ *   Dark:  fundo preto puro, texto claro, detalhes em violeta claro/azul
  *
- * Estrutura em dois níveis:
- *   1. PRIMITIVE PALETTE — valores brutos de cor (não usar diretamente na UI)
- *   2. SEMANTIC TOKENS  — significado semântico (usar nos componentes)
- *
- * Em componentes React Native, use sempre os tokens semânticos via
- * useTheme() hook, nunca os primitivos diretamente.
+ * Mantém os MESMOS NOMES de tokens para não quebrar nenhum componente.
+ * Apenas os VALORES mudam.
  */
 
-import { StyleSheet } from "react-native";
-
-// ─────────────────────────────────────────────
-// 1. PALETA PRIMITIVA
-// ─────────────────────────────────────────────
+// ─── 1. PALETA PRIMITIVA ─────────────────────────────────────────
 
 export const Palette = {
-  // ── Família Brown (paleta principal) ──────
-  brown950: "#180C04",
-  brown900: "#2C1810",
-  brown850: "#3A2214",
-  brown800: "#4A2C1A",
-  brown750: "#5C3320",
-  brown700: "#5C3D1E", // Primary — botões, active states
-  brown650: "#6B4828",
-  brown600: "#8B6340", // Secondary — ícones, elementos médios
-  brown550: "#A07848",
-  brown500: "#B88A52",
-  brown450: "#C4975A", // Accent / Golden — badges, streak, destaques
-  brown400: "#D0A96A",
-  brown350: "#DCBC82",
-  brown300: "#E6CC9A",
-  brown250: "#EDDDB0",
+  // ── Violeta / Roxo (acento principal) ──
+  violet900: '#2E1065',
+  violet800: '#3B0764',  // botões pressionados
+  violet700: '#5B21B6',  // ação primária light mode
+  violet600: '#7C3AED',
+  violet500: '#8B5CF6',  // ação primária dark mode
+  violet400: '#A78BFA',
+  violet300: '#C4B5FD',
+  violet200: '#DDD6FE',
+  violet100: '#EDE9FE',
+  violet50:  '#F5F3FF',
 
-  // ── Família Parchment (backgrounds) ───────
-  parchment50: "#FAF6EE", // Background absoluto (modo claro)
-  parchment100: "#F7F1E3", // Background geral
-  parchment150: "#F3EAD6",
-  parchment200: "#EDE0C4", // Superfícies (cards, inputs)
-  parchment250: "#E8D9B8",
-  parchment300: "#E2D0A8",
-  parchment350: "#DBC890",
-  parchment400: "#D4B483", // Bordas, divisores
-  parchment500: "#C9A070",
-  parchment600: "#B08050",
+  // ── Índigo / Azul (acento secundário) ──
+  indigo700: '#3730A3',
+  indigo600: '#4338CA',
+  indigo500: '#6366F1',
+  indigo400: '#818CF8',
+  indigo300: '#A5B4FC',
+  indigo200: '#C7D2FE',
+  indigo100: '#E0E7FF',
 
-  // ── Família Ink (texto) ───────────────────
-  ink950: "#0A0604",
-  ink900: "#1A0F08",
-  ink800: "#2C1810",
-  ink700: "#3D2415",
-  ink600: "#533018",
-  ink500: "#6B4028",
-  ink400: "#8B5538",
-  ink300: "#A87050",
+  // ── Azul elétrico (destaques de cards) ──
+  blue700:   '#1D4ED8',
+  blue600:   '#2563EB',
+  blue500:   '#3B82F6',
+  blue400:   '#60A5FA',
+  blue300:   '#93C5FD',
+  blue100:   '#DBEAFE',
 
-  // ── Semânticas independentes ──────────────
-  sageGreen: "#4A7C59",
-  sageGreenLight: "#DDF0E4",
-  sageGreenDark: "#2E5238",
+  // ── Rosa / Fúcsia (destaques de cards) ──
+  rose600:   '#E11D48',
+  rose500:   '#F43F5E',
+  rose400:   '#FB7185',
+  rose100:   '#FFE4E6',
 
-  errorRust: "#8B3A2A",
-  errorRustLight: "#FFE4E0",
-  errorRustDark: "#5C2018",
+  // ── Esmeralda (sucesso) ──
+  emerald700: '#047857',
+  emerald600: '#059669',
+  emerald500: '#10B981',
+  emerald400: '#34D399',
+  emerald100: '#D1FAE5',
 
-  warningAmber: "#C4882A",
-  warningAmberLight: "#FFF3CC",
-  warningAmberDark: "#8B5A10",
+  // ── Âmbar (warning) ──
+  amber700:  '#B45309',
+  amber500:  '#F59E0B',
+  amber400:  '#FCD34D',
+  amber100:  '#FEF3C7',
 
-  infoBlue: "#2A5C8B",
-  infoBlueLight: "#DDE9F8",
-  infoBlueDark: "#1A3C5C",
+  // ── Vermelho (erro) ──
+  red700:    '#B91C1C',
+  red600:    '#DC2626',
+  red500:    '#EF4444',
+  red100:    '#FEE2E2',
 
-  // ── Neutros ───────────────────────────────
-  white: "#FFFFFF",
-  black: "#000000",
-  transparent: "transparent",
+  // ── Ciano (info) ──
+  cyan700:   '#0E7490',
+  cyan500:   '#06B6D4',
+  cyan300:   '#67E8F9',
+  cyan100:   '#CFFAFE',
 
-  // ── Dark Mode primitives ──────────────────
-  dark900: "#0E0804",
-  dark850: "#1A0F08",
-  dark800: "#22120A",
-  dark750: "#2A1810",
-  dark700: "#341E14",
-  dark650: "#3E2418",
-  dark600: "#4A2C1E",
-  dark550: "#563528",
-  dark500: "#624030",
-  darkSurface: "#2A1A0E",
-  darkBorder: "#4A3020",
-  darkText: "#E8D5B0",
-  darkTextSub: "#B8956C",
-  darkTextMuted: "#8B6840",
+  // ── Neutros ──
+  white:     '#FFFFFF',
+  gray50:    '#F9FAFB',
+  gray100:   '#F3F4F6',
+  gray200:   '#E5E7EB',
+  gray300:   '#D1D5DB',
+  gray400:   '#9CA3AF',
+  gray500:   '#6B7280',
+  gray600:   '#4B5563',
+  gray700:   '#374151',
+  gray800:   '#1F2937',
+  gray900:   '#111827',
+
+  black:     '#000000',
+  dark50:    '#0A0A0A',
+  dark100:   '#111111',
+  dark150:   '#161616',
+  dark200:   '#1A1A1A',
+  dark300:   '#242424',
+  dark400:   '#2E2E2E',
+  dark500:   '#3A3A3A',
+  dark600:   '#484848',
+  dark700:   '#585858',
+
+  transparent: 'transparent',
 } as const;
 
-// ─────────────────────────────────────────────
-// 2. TOKENS SEMÂNTICOS — LIGHT MODE
-// ─────────────────────────────────────────────
+// ─── 2. TOKENS — LIGHT MODE (fundo branco + roxo) ────────────────
 
 export const LightTokens = {
   // Backgrounds
-  bgPrimary: Palette.parchment50, // Tela principal
-  bgSecondary: Palette.parchment100, // Seções alternadas
-  bgTertiary: Palette.parchment150, // Terceiro nível
-  bgCard: Palette.parchment200, // Cards e painéis
-  bgInput: Palette.parchment50, // Campo de input
-  bgModal: Palette.parchment50, // Fundo de modais
-  bgOverlay: "rgba(44, 24, 16, 0.55)", // Overlay sobre conteúdo
+  bgPrimary:   Palette.white,        // Tela principal
+  bgSecondary: Palette.gray50,       // Seções alternadas
+  bgTertiary:  Palette.gray100,      // Terceiro nível
+  bgCard:      Palette.gray100,      // Cards e painéis
+  bgInput:     Palette.white,        // Campo de input
+  bgModal:     Palette.white,        // Fundo de modais
+  bgOverlay:   'rgba(0,0,0,0.45)',   // Overlay
 
   // Texto
-  textPrimary: Palette.brown900, // Título, corpo principal
-  textSecondary: Palette.brown800, // Subtítulos, labels
-  textTertiary: Palette.brown600, // Placeholders, muted
-  textOnPrimary: Palette.parchment50, // Texto sobre fundo marrom
-  textOnAccent: Palette.brown900, // Texto sobre golden
-  textLink: Palette.brown700, // Links e ações textuais
-  textDisabled: Palette.brown350, // Elementos desativados
-  textVerse: Palette.brown850, // Texto de versículos
+  textPrimary:   Palette.gray900,    // Títulos, corpo
+  textSecondary: Palette.gray700,    // Subtítulos
+  textTertiary:  Palette.gray500,    // Placeholders, muted
+  textOnPrimary: Palette.white,      // Texto sobre botão primário
+  textOnAccent:  Palette.white,
+  textLink:      Palette.violet700,
+  textDisabled:  Palette.gray300,
+  textVerse:     Palette.gray800,    // Texto de versículos
 
-  // Bordas e divisores
-  borderLight: Palette.parchment400, // Divisores suaves
-  borderMedium: Palette.brown300, // Bordas de cards
-  borderStrong: Palette.brown450, // Bordas com destaque
-  borderFocus: Palette.brown700, // Input em foco
+  // Bordas
+  borderLight:  Palette.gray200,
+  borderMedium: Palette.gray300,
+  borderStrong: Palette.gray400,
+  borderFocus:  Palette.violet600,
 
-  // Ações primárias
-  actionPrimary: Palette.brown700, // Botão primário (fundo)
-  actionPrimaryText: Palette.parchment50, // Texto do botão primário
-  actionPrimaryHover: Palette.brown800, // Estado hover/pressed
-  actionSecondary: Palette.parchment200, // Botão secundário (fundo)
-  actionSecondaryText: Palette.brown700, // Texto do botão secundário
-  actionGhost: Palette.transparent, // Botão ghost
-  actionGhostText: Palette.brown700, // Texto do botão ghost
-  actionDestructive: Palette.errorRust, // Ação destrutiva
-  actionDestructiveText: Palette.parchment50,
+  // Ações
+  actionPrimary:          Palette.violet700,
+  actionPrimaryText:      Palette.white,
+  actionPrimaryHover:     Palette.violet800,
+  actionSecondary:        Palette.violet100,
+  actionSecondaryText:    Palette.violet700,
+  actionGhost:            Palette.transparent,
+  actionGhostText:        Palette.violet700,
+  actionDestructive:      Palette.red600,
+  actionDestructiveText:  Palette.white,
 
   // Ícones
-  iconPrimary: Palette.brown700,
-  iconSecondary: Palette.brown600,
-  iconMuted: Palette.brown400,
-  iconOnDark: Palette.parchment200,
+  iconPrimary:  Palette.gray800,
+  iconSecondary: Palette.gray600,
+  iconMuted:    Palette.gray400,
+  iconOnDark:   Palette.gray100,
 
-  // Estado / Feedback
-  success: Palette.sageGreen,
-  successBg: Palette.sageGreenLight,
-  successText: Palette.sageGreenDark,
-  error: Palette.errorRust,
-  errorBg: Palette.errorRustLight,
-  errorText: Palette.errorRustDark,
-  warning: Palette.warningAmber,
-  warningBg: Palette.warningAmberLight,
-  warningText: Palette.warningAmberDark,
-  info: Palette.infoBlue,
-  infoBg: Palette.infoBlueLight,
-  infoText: Palette.infoBlueDark,
+  // Feedback
+  success:     Palette.emerald600,
+  successBg:   Palette.emerald100,
+  successText: Palette.emerald700,
+  error:       Palette.red600,
+  errorBg:     Palette.red100,
+  errorText:   Palette.red700,
+  warning:     Palette.amber500,
+  warningBg:   Palette.amber100,
+  warningText: Palette.amber700,
+  info:        Palette.cyan500,
+  infoBg:      Palette.cyan100,
+  infoText:    Palette.cyan700,
 
-  // Streak / Gamificação
-  streakActive: Palette.brown450,
-  streakBg: Palette.warningAmberLight,
-  streakText: Palette.warningAmberDark,
-  streakIcon: Palette.warningAmber,
+  // Streak
+  streakActive: Palette.amber500,
+  streakBg:     Palette.amber100,
+  streakText:   Palette.amber700,
+  streakIcon:   Palette.amber500,
 
   // Progresso
-  progressFill: Palette.brown700,
-  progressBg: Palette.parchment400,
-  progressText: Palette.brown700,
+  progressFill: Palette.violet700,
+  progressBg:   Palette.gray200,
+  progressText: Palette.violet700,
 
-  // Heatmap de atividade (5 níveis de intensidade)
-  heatmap0: Palette.parchment200, // Sem leitura
-  heatmap1: Palette.brown350, // 1–2 capítulos
-  heatmap2: Palette.brown450, // 3–4 capítulos
-  heatmap3: Palette.brown600, // 5–7 capítulos
-  heatmap4: Palette.brown700, // 8+ capítulos
+  // Heatmap (tons de violeta)
+  heatmap0: Palette.gray100,     // Sem leitura
+  heatmap1: Palette.violet200,   // 1–2 cap
+  heatmap2: Palette.violet400,   // 3–4 cap
+  heatmap3: Palette.violet600,   // 5–7 cap
+  heatmap4: Palette.violet700,   // 8+ cap
 
-  // Destaques de versículos (backgrounds)
-  highlightYellowBg: "#FFF3CC",
-  highlightYellowBorder: Palette.warningAmber,
-  highlightRedBg: "#FFE4E0",
-  highlightRedBorder: Palette.errorRust,
-  highlightBlueBg: "#DDE9F8",
-  highlightBlueBorder: Palette.infoBlue,
-  highlightGreenBg: Palette.sageGreenLight,
-  highlightGreenBorder: Palette.sageGreenDark,
+  // Destaques de versículos
+  highlightYellowBg:     Palette.amber100,
+  highlightYellowBorder: Palette.amber500,
+  highlightRedBg:        Palette.red100,
+  highlightRedBorder:    Palette.red500,
+  highlightBlueBg:       Palette.blue100,
+  highlightBlueBorder:   Palette.blue500,
+  highlightGreenBg:      Palette.emerald100,
+  highlightGreenBorder:  Palette.emerald500,
 
-  // Modo Culto (leitura focada)
-  cultoBg: Palette.parchment50,
-  cultoText: Palette.brown900,
-  cultoVerseNum: Palette.brown400,
+  // Leitor
+  cultoBg:       Palette.white,
+  cultoText:     Palette.gray900,
+  cultoVerseNum: Palette.gray400,
 
   // Navegação
-  tabBarBg: Palette.parchment50,
-  tabBarBorder: Palette.parchment400,
-  tabBarActive: Palette.brown700,
-  tabBarInactive: Palette.brown400,
-  headerBg: Palette.parchment100,
-  headerBorder: Palette.parchment400,
-  headerText: Palette.brown900,
+  tabBarBg:      Palette.white,
+  tabBarBorder:  Palette.gray200,
+  tabBarActive:  Palette.violet700,
+  tabBarInactive: Palette.gray400,
+  headerBg:      Palette.white,
+  headerBorder:  Palette.gray200,
+  headerText:    Palette.gray900,
 
   // Sombras
-  shadow: Palette.brown900,
-} as const;
-
-// ─────────────────────────────────────────────
-// 3. TOKENS SEMÂNTICOS — DARK MODE
-// ─────────────────────────────────────────────
-
-export const DarkTokens = {
-  bgPrimary: Palette.dark850,
-  bgSecondary: Palette.dark800,
-  bgTertiary: Palette.dark750,
-  bgCard: Palette.darkSurface,
-  bgInput: Palette.dark700,
-  bgModal: Palette.dark800,
-  bgOverlay: "rgba(10, 6, 4, 0.72)",
-
-  textPrimary: Palette.darkText,
-  textSecondary: "#D4B080",
-  textTertiary: Palette.darkTextMuted,
-  textOnPrimary: Palette.parchment50,
-  textOnAccent: Palette.brown900,
-  textLink: Palette.brown450,
-  textDisabled: Palette.dark500,
-  textVerse: "#E0C898",
-
-  borderLight: Palette.dark600,
-  borderMedium: Palette.dark550,
-  borderStrong: Palette.brown600,
-  borderFocus: Palette.brown450,
-
-  actionPrimary: Palette.brown600,
-  actionPrimaryText: Palette.parchment50,
-  actionPrimaryHover: Palette.brown700,
-  actionSecondary: Palette.dark600,
-  actionSecondaryText: Palette.darkText,
-  actionGhost: Palette.transparent,
-  actionGhostText: Palette.brown450,
-  actionDestructive: "#A04535",
-  actionDestructiveText: Palette.parchment50,
-
-  iconPrimary: Palette.brown450,
-  iconSecondary: Palette.brown350,
-  iconMuted: Palette.dark500,
-  iconOnDark: Palette.parchment200,
-
-  success: "#5EA874",
-  successBg: "#1A3826",
-  successText: "#8FD4A8",
-  error: "#C0583A",
-  errorBg: "#3A1810",
-  errorText: "#E89080",
-  warning: "#D4A040",
-  warningBg: "#3A2800",
-  warningText: "#EDCA80",
-  info: "#4A88C0",
-  infoBg: "#0E2840",
-  infoText: "#88BEE8",
-
-  streakActive: Palette.brown450,
-  streakBg: "#3A2800",
-  streakText: "#EDCA80",
-  streakIcon: "#D4A040",
-
-  progressFill: Palette.brown450,
-  progressBg: Palette.dark600,
-  progressText: Palette.brown450,
-
-  heatmap0: Palette.dark700,
-  heatmap1: Palette.dark500,
-  heatmap2: "#7A5038",
-  heatmap3: Palette.brown600,
-  heatmap4: Palette.brown500,
-
-  highlightYellowBg: "#3A2800",
-  highlightYellowBorder: "#D4A040",
-  highlightRedBg: "#3A1810",
-  highlightRedBorder: "#C0583A",
-  highlightBlueBg: "#0E2840",
-  highlightBlueBorder: "#4A88C0",
-  highlightGreenBg: "#1A3826",
-  highlightGreenBorder: "#5EA874",
-
-  cultoBg: Palette.dark900,
-  cultoText: "#E8D5B0",
-  cultoVerseNum: Palette.dark500,
-
-  tabBarBg: Palette.dark850,
-  tabBarBorder: Palette.dark650,
-  tabBarActive: Palette.brown450,
-  tabBarInactive: Palette.dark500,
-  headerBg: Palette.dark800,
-  headerBorder: Palette.dark650,
-  headerText: Palette.darkText,
-
   shadow: Palette.black,
 } as const;
 
-// ─────────────────────────────────────────────
-// 4. TIPO UNIFICADO DE TOKENS
-// ─────────────────────────────────────────────
+// ─── 3. TOKENS — DARK MODE (fundo preto + violeta claro) ─────────
 
-export type ColorTokens = typeof LightTokens;
+export const DarkTokens = {
+  // Backgrounds
+  bgPrimary:   Palette.black,        // Tela principal
+  bgSecondary: Palette.dark50,       // Seções alternadas
+  bgTertiary:  Palette.dark100,      // Terceiro nível
+  bgCard:      Palette.dark200,      // Cards e painéis
+  bgInput:     Palette.dark150,      // Campo de input
+  bgModal:     Palette.dark100,      // Fundo de modais
+  bgOverlay:   'rgba(0,0,0,0.65)',   // Overlay
 
-// ─────────────────────────────────────────────
-// 5. ESTILOS DE SOMBRA
-// ─────────────────────────────────────────────
+  // Texto
+  textPrimary:   Palette.white,
+  textSecondary: '#E0E0E0',
+  textTertiary:  Palette.gray400,
+  textOnPrimary: Palette.white,
+  textOnAccent:  Palette.white,
+  textLink:      Palette.violet400,
+  textDisabled:  Palette.dark600,
+  textVerse:     '#F0F0F0',
+
+  // Bordas
+  borderLight:  Palette.dark300,
+  borderMedium: Palette.dark400,
+  borderStrong: Palette.dark600,
+  borderFocus:  Palette.violet500,
+
+  // Ações
+  actionPrimary:         Palette.violet500,
+  actionPrimaryText:     Palette.white,
+  actionPrimaryHover:    Palette.violet600,
+  actionSecondary:       '#2D1B69',      // violeta muito escuro
+  actionSecondaryText:   Palette.violet400,
+  actionGhost:           Palette.transparent,
+  actionGhostText:       Palette.violet400,
+  actionDestructive:     Palette.rose500,
+  actionDestructiveText: Palette.white,
+
+  // Ícones
+  iconPrimary:  '#E5E5E5',
+  iconSecondary: Palette.gray400,
+  iconMuted:    Palette.dark600,
+  iconOnDark:   Palette.gray200,
+
+  // Feedback
+  success:     Palette.emerald400,
+  successBg:   '#064E3B',
+  successText: Palette.emerald400,
+  error:       Palette.rose400,
+  errorBg:     '#450A0A',
+  errorText:   Palette.rose400,
+  warning:     Palette.amber400,
+  warningBg:   '#451A03',
+  warningText: Palette.amber400,
+  info:        Palette.cyan300,
+  infoBg:      '#083344',
+  infoText:    Palette.cyan300,
+
+  // Streak
+  streakActive: Palette.amber400,
+  streakBg:     '#451A03',
+  streakText:   Palette.amber400,
+  streakIcon:   Palette.amber400,
+
+  // Progresso
+  progressFill: Palette.violet500,
+  progressBg:   Palette.dark400,
+  progressText: Palette.violet400,
+
+  // Heatmap (tons de violeta no escuro)
+  heatmap0: Palette.dark300,
+  heatmap1: '#2D1B69',
+  heatmap2: '#4C1D95',
+  heatmap3: Palette.violet600,
+  heatmap4: Palette.violet500,
+
+  // Destaques de versículos
+  highlightYellowBg:     '#451A03',
+  highlightYellowBorder: Palette.amber400,
+  highlightRedBg:        '#450A0A',
+  highlightRedBorder:    Palette.rose400,
+  highlightBlueBg:       '#1E3A5F',
+  highlightBlueBorder:   Palette.blue400,
+  highlightGreenBg:      '#064E3B',
+  highlightGreenBorder:  Palette.emerald400,
+
+  // Leitor
+  cultoBg:       Palette.black,
+  cultoText:     '#F0F0F0',
+  cultoVerseNum: Palette.dark600,
+
+  // Navegação
+  tabBarBg:       Palette.black,
+  tabBarBorder:   Palette.dark300,
+  tabBarActive:   Palette.violet500,
+  tabBarInactive: Palette.dark600,
+  headerBg:       Palette.black,
+  headerBorder:   Palette.dark300,
+  headerText:     Palette.white,
+
+  // Sombras
+  shadow: Palette.black,
+} as const;
+
+// ─── 4. TIPO UNIFICADO ───────────────────────────────────────────
+
+// Mapeado para string puro para que LightTokens e DarkTokens
+// (que têm literals diferentes) sejam ambos atribuíveis ao tipo.
+export type ColorTokens = {
+  readonly [K in keyof typeof LightTokens]: string;
+};
+
+// ─── 5. SOMBRAS ─────────────────────────────────────────────────
 
 export const Shadows = {
-  sm: {
-    shadowColor: Palette.brown900,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  md: {
-    shadowColor: Palette.brown900,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  lg: {
-    shadowColor: Palette.brown900,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.14,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  xl: {
-    shadowColor: Palette.brown900,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    elevation: 10,
-  },
+  sm: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 2,  elevation: 1 },
+  md: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.10, shadowRadius: 4,  elevation: 3 },
+  lg: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 8,  elevation: 6 },
+  xl: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 10 },
 } as const;
 
 export const DarkShadows = {
-  sm: { ...Shadows.sm, shadowOpacity: 0.3, shadowColor: Palette.black },
-  md: { ...Shadows.md, shadowOpacity: 0.4, shadowColor: Palette.black },
-  lg: { ...Shadows.lg, shadowOpacity: 0.5, shadowColor: Palette.black },
-  xl: { ...Shadows.xl, shadowOpacity: 0.6, shadowColor: Palette.black },
+  sm: { ...Shadows.sm, shadowOpacity: 0.4 },
+  md: { ...Shadows.md, shadowOpacity: 0.5 },
+  lg: { ...Shadows.lg, shadowOpacity: 0.6 },
+  xl: { ...Shadows.xl, shadowOpacity: 0.7 },
 } as const;
 
-// ─────────────────────────────────────────────
-// 6. UTILITÁRIOS
-// ─────────────────────────────────────────────
+// ─── 6. UTILITÁRIOS ──────────────────────────────────────────────
 
-/**
- * Retorna a cor do heatmap para N capítulos lidos num dia.
- */
-export function getHeatmapColor(
-  chaptersRead: number,
-  tokens: ColorTokens,
-): string {
+export function getHeatmapColor(chaptersRead: number, tokens: ColorTokens): string {
   if (chaptersRead === 0) return tokens.heatmap0;
   if (chaptersRead <= 2) return tokens.heatmap1;
   if (chaptersRead <= 4) return tokens.heatmap2;
@@ -364,13 +343,34 @@ export function getHeatmapColor(
   return tokens.heatmap4;
 }
 
-/**
- * Converte hex para rgba com opacidade customizada.
- */
 export function hexToRgba(hex: string, opacity: number): string {
-  const clean = hex.replace("#", "");
+  const clean = hex.replace('#', '');
   const r = parseInt(clean.substring(0, 2), 16);
   const g = parseInt(clean.substring(2, 4), 16);
   const b = parseInt(clean.substring(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
+
+/**
+ * Cores de acento para cards — para usar em badges e bordas coloridas.
+ * Harmoniosas com o roxo principal.
+ */
+export const CardAccents = {
+  purple: { bg: Palette.violet100, border: Palette.violet400, text: Palette.violet700 },
+  blue:   { bg: Palette.blue100,   border: Palette.blue400,   text: Palette.blue700   },
+  rose:   { bg: Palette.rose100,   border: Palette.rose400,   text: Palette.rose600   },
+  cyan:   { bg: Palette.cyan100,   border: Palette.cyan500,   text: Palette.cyan700   },
+  green:  { bg: Palette.emerald100, border: Palette.emerald400, text: Palette.emerald700 },
+  amber:  { bg: Palette.amber100,  border: Palette.amber400,  text: Palette.amber700  },
+  indigo: { bg: Palette.indigo100, border: Palette.indigo400, text: Palette.indigo700 },
+} as const;
+
+export const DarkCardAccents = {
+  purple: { bg: '#2D1B69', border: Palette.violet500, text: Palette.violet400 },
+  blue:   { bg: '#1E3A5F', border: Palette.blue400,   text: Palette.blue300   },
+  rose:   { bg: '#450A0A', border: Palette.rose400,   text: Palette.rose400   },
+  cyan:   { bg: '#083344', border: Palette.cyan300,   text: Palette.cyan300   },
+  green:  { bg: '#064E3B', border: Palette.emerald400, text: Palette.emerald400 },
+  amber:  { bg: '#451A03', border: Palette.amber400,  text: Palette.amber400  },
+  indigo: { bg: '#1E1B4B', border: Palette.indigo400, text: Palette.indigo300 },
+} as const;

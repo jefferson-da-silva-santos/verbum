@@ -1,12 +1,5 @@
 /**
- * VERBUM — app/_layout.tsx  [CORRIGIDO]
- *
- * FIX 1: migrate002 agora roda DENTRO de initDatabase com try-catch.
- *        Se falhar, o app continua funcionando sem as novas features
- *        (melhor do que crashar o app inteiro).
- *
- * FIX 2: initDatabase() deve ser chamado primeiro, e migrate002
- *        deve receber o db já inicializado.
+ * VERBUM — app/_layout.tsx  [ATUALIZADO com rotas legais]
  */
 
 import { useEffect } from 'react';
@@ -44,24 +37,15 @@ function RootNavigator() {
   useEffect(() => {
     (async () => {
       try {
-        // 1. Inicializa o banco principal (tabelas base: users, plans, etc.)
         await initDatabase();
-
-        // 2. Roda a migration das features avançadas DEPOIS da base
-        //    Envolto em try-catch para não quebrar o app se já rodou
-        //    ou se houver algum conflito
         try {
           const db = getDb();
           await migrate002(db);
           console.log('[DB] Migration 002 concluída com sucesso.');
         } catch (migrationErr) {
-          // Não crasha o app — apenas loga o erro
           console.warn('[DB] Migration 002 falhou (pode já ter rodado):', migrationErr);
         }
-
-        // 3. Limpa cache expirado em background
         CacheManager.initialize().catch(() => {});
-
       } catch (err) {
         console.error('[DB] Erro crítico na inicialização:', err);
       } finally {
@@ -77,12 +61,7 @@ function RootNavigator() {
 
   if (isLoading) {
     return (
-      <View style={{
-        flex: 1,
-        backgroundColor: tokens.bgPrimary,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
+      <View style={{ flex: 1, backgroundColor: tokens.bgPrimary, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator size="large" color={tokens.actionPrimary} />
       </View>
     );
@@ -93,39 +72,43 @@ function RootNavigator() {
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(app)" />
 
-      {/* Leitor */}
+      {/* ── LEITOR ── */}
       <Stack.Screen
         name="(app)/modals/chapter-reader"
         options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
       />
 
-      {/* Comparação */}
+      {/* ── COMPARAÇÃO ── */}
       <Stack.Screen name="(app)/modals/verse-compare"         options={{ presentation: 'modal' }} />
 
-      {/* Caderno do Pregador */}
+      {/* ── CADERNO DO PREGADOR ── */}
       <Stack.Screen name="(app)/modals/sermon-list"           options={{ presentation: 'modal' }} />
       <Stack.Screen
         name="(app)/modals/sermon-editor"
         options={{ presentation: 'fullScreenModal', animation: 'slide_from_right' }}
       />
 
-      {/* Modo Púlpito */}
+      {/* ── MODO PÚLPITO ── */}
       <Stack.Screen
         name="(app)/modals/pulpit-mode"
         options={{ presentation: 'fullScreenModal', animation: 'fade' }}
       />
 
-      {/* Mapas Temáticos */}
+      {/* ── MAPAS TEMÁTICOS ── */}
       <Stack.Screen name="(app)/modals/thematic-maps"         options={{ presentation: 'modal' }} />
 
-      {/* Exposição Guiada */}
+      {/* ── EXPOSIÇÃO GUIADA ── */}
       <Stack.Screen name="(app)/modals/study-note"            options={{ presentation: 'modal' }} />
       <Stack.Screen name="(app)/modals/study-notes-list"      options={{ presentation: 'modal' }} />
 
-      {/* Conexões Proféticas */}
+      {/* ── CONEXÕES PROFÉTICAS ── */}
       <Stack.Screen name="(app)/modals/prophetic-connections" options={{ presentation: 'modal' }} />
 
-      {/* Demais modais */}
+      {/* ── LEGAL (LGPD) ── */}
+      <Stack.Screen name="(app)/modals/privacy-policy"        options={{ presentation: 'modal' }} />
+      <Stack.Screen name="(app)/modals/terms"                 options={{ presentation: 'modal' }} />
+
+      {/* ── DEMAIS MODAIS ── */}
       <Stack.Screen name="(app)/modals/create-plan"           options={{ presentation: 'modal' }} />
       <Stack.Screen name="(app)/modals/note-editor"           options={{ presentation: 'modal' }} />
       <Stack.Screen name="(app)/modals/search"                options={{ presentation: 'modal' }} />
@@ -135,7 +118,8 @@ function RootNavigator() {
       <Stack.Screen name="(app)/modals/diary-list"            options={{ presentation: 'modal' }} />
       <Stack.Screen name="(app)/modals/diary-editor"          options={{ presentation: 'modal' }} />
       <Stack.Screen name="(app)/modals/book-selector"         options={{ presentation: 'modal' }} />
-      <Stack.Screen name="(app)/modals/calibrate-speed"       options={{ presentation: 'modal' }} />
+      <Stack.Screen name="(app)/modals/calibrate-speed"          options={{ presentation: 'modal' }} />
+      <Stack.Screen name="(app)/modals/plan-detail"             options={{ presentation: 'modal' }} />
     </Stack>
   );
 }
