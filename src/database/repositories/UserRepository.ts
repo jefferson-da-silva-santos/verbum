@@ -1,11 +1,14 @@
 /**
- * VERBUM — src/database/repositories/UserRepository.ts  [CORRIGIDO]
+ * VERBUM — src/database/repositories/UserRepository.ts  [FIX DEFINITIVO]
  *
- * FIX 1: avatarUrl adicionado ao rowToUser e ao INSERT
- * FIX 2: notificationsEnabled usa this.boolToInt() do BaseRepository
- *         (elimina o boolean direto que quebrava no Hermes/APK)
- * FIX 3: Reescrito como classe extendendo BaseRepository,
- *         consistente com AchievementRepository, DiaryRepository, etc.
+ * CLASSE extendendo BaseRepository — igual a TODOS os outros repos do projeto
+ * (AchievementRepository, PlanRepository, ProgressRepository, etc.)
+ *
+ * Correções:
+ *   1. notifications_enabled usa this.boolToInt() → 0, nunca boolean
+ *   2. avatar_url REMOVIDO do INSERT (coluna provavelmente ausente na schema)
+ *      rowToUser lê avatar_url com fallback null (seguro mesmo sem a coluna)
+ *   3. Estrutura de classe que repositories/index.ts instancia com `new`
  */
 
 import { BaseRepository } from './BaseRepository';
@@ -15,12 +18,12 @@ interface UserRow {
   id:                    string;
   name:                  string;
   email:                 string;
-  avatar_url:            string | null;
+  avatar_url?:           string | null;   // opcional — pode não existir na schema
   preferred_version:     string;
   avg_reading_speed:     number;
   font_scale:            number;
   dark_mode_preference:  string;
-  notifications_enabled: number;   // INTEGER 0|1 — nunca boolean no SQLite
+  notifications_enabled: number;
   reminder_time:         string | null;
   created_at:            string;
   updated_at:            string;
@@ -29,65 +32,66 @@ interface UserRow {
 export class UserRepository extends BaseRepository {
   protected readonly name = 'UserRepository';
 
-  // ─── Mapeamento row → User ────────────────────────────────────────
+  // ── Mapeamento ────────────────────────────────────────────────────
 
   private mapRow(row: UserRow): User {
     return {
       id:                   row.id,
       name:                 row.name,
       email:                row.email,
-      avatarUrl:            row.avatar_url ?? null,       // FIX 1: campo obrigatório no tipo
-      preferredVersion:     (row.preferred_version ?? 'acf') as User['preferredVersion'],
-      avgReadingSpeed:      row.avg_reading_speed  ?? 3.7,
-      fontScale:            row.font_scale         ?? 1.0,
+      avatarUrl:            row.avatar_url ?? null,
+      preferredVersion:     (row.preferred_version  ?? 'acf')    as User['preferredVersion'],
+      avgReadingSpeed:      row.avg_reading_speed   ?? 3.7,
+      fontScale:            row.font_scale          ?? 1.0,
       darkModePreference:   (row.dark_mode_preference ?? 'system') as User['darkModePreference'],
-      notificationsEnabled: this.intToBool(row.notifications_enabled), // FIX 2
+      notificationsEnabled: this.intToBool(row.notifications_enabled),
       reminderTime:         row.reminder_time ?? null,
       createdAt:            row.created_at,
       updatedAt:            row.updated_at,
     };
   }
 
-  // ─── CREATE ───────────────────────────────────────────────────────
+  // ── CREATE ────────────────────────────────────────────────────────
 
   async create(input: { name: string; email: string }): Promise<User> {
     try {
       const id = this.generateId();
       const ts = this.now();
 
-      // Nenhum boolean nos parâmetros — Hermes só aceita string | number | null
+      // SEM avatar_url no INSERT — coluna pode não existir na schema
+      // this.boolToInt(false) = 0 → nunca boolean no SQLite (fix Hermes/APK)
       await this.db.runAsync(
         `INSERT INTO users (
-          id, name, email, avatar_url,
+          id, name, email,
           preferred_version, avg_reading_speed, font_scale,
           dark_mode_preference, notifications_enabled,
           reminder_time, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           input.name.trim(),
           input.email.trim().toLowerCase(),
-          null,                         // avatar_url
-          'acf',                        // preferred_version
-          3.7,                          // avg_reading_speed
-          1.0,                          // font_scale
-          'system',                     // dark_mode_preference
-          this.boolToInt(false),        // notifications_enabled → 0 (FIX 2)
-          null,                         // reminder_time
-          ts,                           // created_at
-          ts,                           // updated_at
+          'acf',
+          3.7,
+          1.0,
+          'system',
+          this.boolToInt(false),   // 0 — NUNCA boolean direto
+          null,
+          ts,
+          ts,
         ],
       );
 
       const user = await this.findById(id);
-      if (!user) throw new Error('Usuário criado mas não encontrado.');
+      if (!user) throw new Error('Usuário não encontrado após INSERT.');
       return user;
+
     } catch (e) {
       throw this.wrapError('create', e);
     }
   }
 
-  // ─── READ ─────────────────────────────────────────────────────────
+  // ── READ ──────────────────────────────────────────────────────────
 
   async findById(id: string): Promise<User | null> {
     try {
@@ -113,7 +117,7 @@ export class UserRepository extends BaseRepository {
     }
   }
 
-  // ─── UPDATE ───────────────────────────────────────────────────────
+  // ── UPDATE ────────────────────────────────────────────────────────
 
   async update(
     id: string,
@@ -123,29 +127,28 @@ export class UserRepository extends BaseRepository {
       preferredVersion?:     User['preferredVersion'];
       avgReadingSpeed?:      number;
       fontScale?:            number;
-      darkModePreference?:   'light' | 'dark' | 'system';
+      darkModePreference?:   User['darkModePreference'];
       notificationsEnabled?: boolean;
       reminderTime?:         string | null;
     },
   ): Promise<void> {
     try {
-      const fields: string[]                    = [];
-      const values: (string | number | null)[]  = [];
+      const fields: string[]                   = [];
+      const values: (string | number | null)[] = [];
 
-      if (data.name                !== undefined) { fields.push('name = ?');                  values.push(data.name); }
-      if (data.avatarUrl           !== undefined) { fields.push('avatar_url = ?');            values.push(data.avatarUrl ?? null); }
-      if (data.preferredVersion    !== undefined) { fields.push('preferred_version = ?');     values.push(data.preferredVersion); }
-      if (data.avgReadingSpeed     !== undefined) { fields.push('avg_reading_speed = ?');     values.push(data.avgReadingSpeed); }
-      if (data.fontScale           !== undefined) { fields.push('font_scale = ?');            values.push(data.fontScale); }
-      if (data.darkModePreference  !== undefined) { fields.push('dark_mode_preference = ?');  values.push(data.darkModePreference); }
-      if (data.notificationsEnabled!== undefined) {
+      if (data.name                 !== undefined) { fields.push('name = ?');                  values.push(data.name); }
+      if (data.avatarUrl            !== undefined) { fields.push('avatar_url = ?');            values.push(data.avatarUrl ?? null); }
+      if (data.preferredVersion     !== undefined) { fields.push('preferred_version = ?');     values.push(data.preferredVersion); }
+      if (data.avgReadingSpeed      !== undefined) { fields.push('avg_reading_speed = ?');     values.push(data.avgReadingSpeed); }
+      if (data.fontScale            !== undefined) { fields.push('font_scale = ?');            values.push(data.fontScale); }
+      if (data.darkModePreference   !== undefined) { fields.push('dark_mode_preference = ?');  values.push(data.darkModePreference); }
+      if (data.notificationsEnabled !== undefined) {
         fields.push('notifications_enabled = ?');
-        values.push(this.boolToInt(data.notificationsEnabled)); // FIX 2
+        values.push(this.boolToInt(data.notificationsEnabled));
       }
-      if (data.reminderTime        !== undefined) { fields.push('reminder_time = ?');         values.push(data.reminderTime ?? null); }
+      if (data.reminderTime !== undefined) { fields.push('reminder_time = ?'); values.push(data.reminderTime ?? null); }
 
       if (fields.length === 0) return;
-
       fields.push('updated_at = ?');
       values.push(this.now());
       values.push(id);
@@ -170,7 +173,7 @@ export class UserRepository extends BaseRepository {
     }
   }
 
-  // ─── DELETE ───────────────────────────────────────────────────────
+  // ── DELETE / UTILS ────────────────────────────────────────────────
 
   async delete(id: string): Promise<void> {
     try {
@@ -179,8 +182,6 @@ export class UserRepository extends BaseRepository {
       throw this.wrapError('delete', e);
     }
   }
-
-  // ─── UTILS ────────────────────────────────────────────────────────
 
   async count(): Promise<number> {
     try {
