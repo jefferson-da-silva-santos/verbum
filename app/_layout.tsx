@@ -13,6 +13,8 @@ import { useAuthContext }  from '../src/context/AuthContext';
 import { initDatabase, getDb } from '../src/database';
 import { CacheManager }   from '../src/api/cacheManager';
 import { migrate002 }     from '../src/database/migrations/002_features';
+import { migrate003 } from '../src/database/migrations/003_user_avatar';
+import { migrate004 } from '../src/database/migrations/004_seed_test_user';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -45,6 +47,22 @@ function RootNavigator() {
         } catch (migrationErr) {
           console.warn('[DB] Migration 002 falhou (pode já ter rodado):', migrationErr);
         }
+        try {
+          const db = getDb();
+          await migrate003(db);
+          console.log('[DB] Migration 003 concluída com sucesso.');
+        } catch (migrationErr) {
+          console.warn('[DB] Migration 003 falhou (pode já ter rodado):', migrationErr);
+        }
+        if (__DEV__) {
+          try {
+            const db = getDb();
+            await migrate004(db);
+          } catch (seedErr) {
+            console.warn('[DB] Seed do usuário de teste falhou:', seedErr);
+          }
+        }
+
         CacheManager.initialize().catch(() => {});
       } catch (err) {
         console.error('[DB] Erro crítico na inicialização:', err);
