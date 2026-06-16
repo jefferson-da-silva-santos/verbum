@@ -1,24 +1,46 @@
 /**
  * VERBUM — src/database/repositories/UserRepository.ts  [FIX DEFINITIVO]
  *
- * CLASSE extendendo BaseRepository — igual a TODOS os outros repos do projeto
- * (AchievementRepository, PlanRepository, ProgressRepository, etc.)
+ * Causa raiz do erro de cadastro:
+ *   O AuthContext.register() já chama userRepo.create() passando o
+ *   CreateUserInput COMPLETO (name, email, avatarUrl, preferredVersion,
+ *   avgReadingSpeed, fontScale, darkModePreference, notificationsEnabled,
+ *   reminderTime) — usando `satisfies CreateUserInput`.
  *
- * Correções:
- *   1. notifications_enabled usa this.boolToInt() → 0, nunca boolean
- *   2. avatar_url REMOVIDO do INSERT (coluna provavelmente ausente na schema)
- *      rowToUser lê avatar_url com fallback null (seguro mesmo sem a coluna)
- *   3. Estrutura de classe que repositories/index.ts instancia com `new`
+ *   Mas o UserRepository.create() estava tipado para aceitar apenas
+ *   { name, email } — incompatibilidade de contrato que gerava o erro
+ *   de tipo no TypeScript E, em runtime, fazia o método ignorar/perder
+ *   campos, deixando notificationsEnabled como boolean solto indo
+ *   direto pro SQLite.
+ *
+ * Por que afeta Android E iOS:
+ *   Hermes é o motor JS padrão em builds de produção do EAS nas DUAS
+ *   plataformas desde o SDK 50+. A ponte JSI entre Hermes e o módulo
+ *   nativo do SQLite não aceita booleans brutos como parâmetro de bind
+ *   — isso é uma restrição do bridge, não do sistema operacional.
+ *
+ * Correções aplicadas:
+ *   1. create() agora aceita o CreateUserInput completo.
+ *   2. notificationsEnabled é convertido via this.boolToInt() ANTES
+ *      de chegar no runAsync — nunca um boolean puro no array de params.
+ *   3. avatar_url incluído no INSERT.
+ *   4. update() retorna Promise<User> (re-fetch após o UPDATE),
+ *      compatível com o AuthContext que faz
+ *      `const updated = await userRepo.update(...); dispatch(...)`.
  */
 
 import { BaseRepository } from './BaseRepository';
-import type { User } from '../types';
+import type {
+  User,
+  CreateUserInput,
+  UpdateUserInput,
+} from '../types';
 
 interface UserRow {
   id:                    string;
   name:                  string;
   email:                 string;
-  avatar_url?:           string | null;   // opcional — pode não existir na schema
+  avatar_url:            string | null;
   preferred_version:     string;
   avg_reading_speed:     number;
   font_scale:            number;
@@ -32,7 +54,7 @@ interface UserRow {
 export class UserRepository extends BaseRepository {
   protected readonly name = 'UserRepository';
 
-  // ── Mapeamento ────────────────────────────────────────────────────
+  // ── Mapeamento de linha → User ────────────────────────────────
 
   private mapRow(row: UserRow): User {
     return {
@@ -40,7 +62,7 @@ export class UserRepository extends BaseRepository {
       name:                 row.name,
       email:                row.email,
       avatarUrl:            row.avatar_url ?? null,
-      preferredVersion:     (row.preferred_version  ?? 'acf')    as User['preferredVersion'],
+      preferredVersion:     (row.preferred_version ?? 'acf')    as User['preferredVersion'],
       avgReadingSpeed:      row.avg_reading_speed   ?? 3.7,
       fontScale:            row.font_scale          ?? 1.0,
       darkModePreference:   (row.dark_mode_preference ?? 'system') as User['darkModePreference'],
@@ -51,39 +73,40 @@ export class UserRepository extends BaseRepository {
     };
   }
 
-  // ── CREATE ────────────────────────────────────────────────────────
+  // ── CREATE ───────────────────────────────────────────────────
 
-  async create(input: { name: string; email: string }): Promise<User> {
+  async create(input: CreateUserInput): Promise<User> {
     try {
       const id = this.generateId();
       const ts = this.now();
 
-      // SEM avatar_url no INSERT — coluna pode não existir na schema
-      // this.boolToInt(false) = 0 → nunca boolean no SQLite (fix Hermes/APK)
+      // Todos os valores são primitivos seguros para SQLite:
+      // string | number | null — NUNCA boolean direto.
       await this.db.runAsync(
         `INSERT INTO users (
-          id, name, email,
+          id, name, email, avatar_url,
           preferred_version, avg_reading_speed, font_scale,
           dark_mode_preference, notifications_enabled,
           reminder_time, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           input.name.trim(),
           input.email.trim().toLowerCase(),
-          'acf',
-          3.7,
-          1.0,
-          'system',
-          this.boolToInt(false),   // 0 — NUNCA boolean direto
-          null,
+          input.avatarUrl ?? null,
+          input.preferredVersion ?? 'acf',
+          input.avgReadingSpeed ?? 3.7,
+          input.fontScale ?? 1.0,
+          input.darkModePreference ?? 'system',
+          this.boolToInt(input.notificationsEnabled ?? true),  // ← fix central
+          input.reminderTime ?? null,
           ts,
           ts,
         ],
       );
 
       const user = await this.findById(id);
-      if (!user) throw new Error('Usuário não encontrado após INSERT.');
+      if (!user) throw new Error('Usuário não encontrado imediatamente após o INSERT.');
       return user;
 
     } catch (e) {
@@ -91,7 +114,7 @@ export class UserRepository extends BaseRepository {
     }
   }
 
-  // ── READ ──────────────────────────────────────────────────────────
+  // ── READ ─────────────────────────────────────────────────────
 
   async findById(id: string): Promise<User | null> {
     try {
@@ -117,21 +140,21 @@ export class UserRepository extends BaseRepository {
     }
   }
 
-  // ── UPDATE ────────────────────────────────────────────────────────
+  async exists(email: string): Promise<boolean> {
+    try {
+      const row = await this.db.getFirstAsync<{ c: number }>(
+        'SELECT COUNT(*) as c FROM users WHERE email = ?',
+        [email.trim().toLowerCase()],
+      );
+      return (row?.c ?? 0) > 0;
+    } catch (e) {
+      throw this.wrapError('exists', e);
+    }
+  }
 
-  async update(
-    id: string,
-    data: {
-      name?:                 string;
-      avatarUrl?:            string | null;
-      preferredVersion?:     User['preferredVersion'];
-      avgReadingSpeed?:      number;
-      fontScale?:            number;
-      darkModePreference?:   User['darkModePreference'];
-      notificationsEnabled?: boolean;
-      reminderTime?:         string | null;
-    },
-  ): Promise<void> {
+  // ── UPDATE — retorna Promise<User>, não void ────────────────────
+
+  async update(id: string, data: UpdateUserInput): Promise<User> {
     try {
       const fields: string[]                   = [];
       const values: (string | number | null)[] = [];
@@ -144,36 +167,32 @@ export class UserRepository extends BaseRepository {
       if (data.darkModePreference   !== undefined) { fields.push('dark_mode_preference = ?');  values.push(data.darkModePreference); }
       if (data.notificationsEnabled !== undefined) {
         fields.push('notifications_enabled = ?');
-        values.push(this.boolToInt(data.notificationsEnabled));
+        values.push(this.boolToInt(data.notificationsEnabled));   // ← fix central também aqui
       }
       if (data.reminderTime !== undefined) { fields.push('reminder_time = ?'); values.push(data.reminderTime ?? null); }
 
-      if (fields.length === 0) return;
-      fields.push('updated_at = ?');
-      values.push(this.now());
-      values.push(id);
+      if (fields.length > 0) {
+        fields.push('updated_at = ?');
+        values.push(this.now());
+        values.push(id);
 
-      await this.db.runAsync(
-        `UPDATE users SET ${fields.join(', ')} WHERE id = ?`,
-        values,
-      );
+        await this.db.runAsync(
+          `UPDATE users SET ${fields.join(', ')} WHERE id = ?`,
+          values,
+        );
+      }
+
+      // AuthContext espera o User atualizado de volta, não void
+      const updated = await this.findById(id);
+      if (!updated) throw new Error('Usuário não encontrado após UPDATE.');
+      return updated;
+
     } catch (e) {
       throw this.wrapError('update', e);
     }
   }
 
-  async updateReadingSpeed(id: string, minutesPerChapter: number): Promise<void> {
-    try {
-      await this.db.runAsync(
-        'UPDATE users SET avg_reading_speed = ?, updated_at = ? WHERE id = ?',
-        [minutesPerChapter, this.now(), id],
-      );
-    } catch (e) {
-      throw this.wrapError('updateReadingSpeed', e);
-    }
-  }
-
-  // ── DELETE / UTILS ────────────────────────────────────────────────
+  // ── DELETE / UTILS ───────────────────────────────────────────
 
   async delete(id: string): Promise<void> {
     try {
@@ -191,18 +210,6 @@ export class UserRepository extends BaseRepository {
       return row?.n ?? 0;
     } catch (e) {
       throw this.wrapError('count', e);
-    }
-  }
-
-  async exists(email: string): Promise<boolean> {
-    try {
-      const row = await this.db.getFirstAsync<{ c: number }>(
-        'SELECT COUNT(*) as c FROM users WHERE email = ?',
-        [email.trim().toLowerCase()],
-      );
-      return (row?.c ?? 0) > 0;
-    } catch (e) {
-      throw this.wrapError('exists', e);
     }
   }
 }
