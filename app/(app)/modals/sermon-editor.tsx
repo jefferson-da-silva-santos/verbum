@@ -1,17 +1,25 @@
 /**
- * VERBUM — app/(app)/modals/sermon-editor.tsx  [CORRIGIDO v3]
+ * VERBUM — app/(app)/modals/sermon-editor.tsx  [v4 — outline estruturado]
  *
- * FIX: Removido paddingTop: insets.top do header interno.
+ * MUDANÇAS PRINCIPAIS:
  *
- * O modal NÃO cobre o AppHeader do drawer no Android — ele renderiza
- * DENTRO do layout, logo abaixo do AppHeader. Por isso:
- *   - paddingTop: insets.top + 8  →  padding duplo (gap enorme)
- *   - paddingTop: 8               →  correto (cola logo abaixo do header)
+ * 1. BUG CORRIGIDO: a aba Outline nunca era salva. O triggerSave()
+ *    montava o payload de update sem o campo `outline` — tudo que
+ *    você digitava lá se perdia ao trocar de aba ou fechar o app.
  *
- * Também corrigido:
- *   - Hint removido (conflitava visualmente com o placeholder do TextInput)
- *   - Layout sem SafeAreaView e sem KeyboardAvoidingView aninhados
- *   - flex:1 garantido na cadeia View → Tab content → ScrollView
+ * 2. Outline deixou de ser um textarea de texto solto e passou a ser
+ *    uma lista estruturada de pontos (principais e sub-pontos), com
+ *    botões de adicionar/remover/mover — isso é o que permite ao
+ *    Modo Púlpito renderizar um slide de outline com hierarquia visual
+ *    real, em vez de um bloco de texto cru.
+ *
+ * 3. handleOpenPulpit agora navega só com `sermonId`. O Modo Púlpito
+ *    busca o sermão completo (Contexto, Estrutura, Outline, Exegese,
+ *    Aplicação, Versículos) direto do banco — sem depender de tudo
+ *    isso caber numa query string de URL.
+ *
+ * 4. Botão de iniciar o púlpito ficou mais evidente (pill com
+ *    gradiente + label), não só um ícone solto.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -20,6 +28,7 @@ import {
   KeyboardAvoidingView, Platform, Share, Alert, ActivityIndicator,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -27,6 +36,17 @@ import { useTheme }         from '../../../src/context/ThemeContext';
 import { SermonRepository } from '../../../src/database/repositories/SermonRepository';
 import type { SermonWithVerses, SermonStatus } from '../../../src/database/types';
 import { SERMON_STATUS_LABELS, SERMON_STATUS_COLORS } from '../../../src/database/types';
+
+
+export interface SermonOutlineItem {
+  id:    string;
+  level: 0 | 1;
+  text:  string;
+}
+
+function newOutlineId() {
+  return `o_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
 
 // ─── Abas ───────────────────────────────────────────────────────────
 
@@ -41,13 +61,20 @@ const TABS: { key: Tab; label: string; icon: keyof typeof MaterialCommunityIcons
   { key: 'application', label: 'Aplicação', icon: 'heart-outline'        },
 ];
 
-const PLACEHOLDERS: Record<Tab, string> = {
-  passage:     '',
-  context:     'Quem escreveu? Para quem? Quando?\nQual o contexto histórico e o gênero literário?',
-  structure:   'Como o texto está organizado?\nSeções, paralelismos, quiasmos, palavras-chave...',
-  exegesis:    'O que o texto diz e significa?\nAnalise versículo a versículo.',
-  outline:     '1. Introdução\n   — Ilustração de abertura\n\n2. Ponto principal\n   — Subponto\n\n3. Conclusão e chamado',
-  application: 'O que essa verdade muda na vida do ouvinte?\nO que ele deve crer, sentir ou fazer de diferente?',
+const SECTION_HELP: Record<Tab, string> = {
+  passage:     'Referência e versículos que você vai pregar.',
+  context:     'Quem escreveu? Para quem? Quando? Contexto histórico e gênero literário.',
+  structure:   'Como o texto está organizado — seções, paralelismos, quiasmos, palavras-chave.',
+  exegesis:    'O que o texto diz e significa. Análise versículo a versículo.',
+  outline:     'Os pontos da sua pregação, em ordem. Vão aparecer como slide no Modo Púlpito.',
+  application: 'O que essa verdade muda na vida do ouvinte — o que crer, sentir ou fazer.',
+};
+
+const PLACEHOLDERS: Partial<Record<Tab, string>> = {
+  context:     'Ex: Paulo escreve aos romanos por volta de 57 d.C., antes de visitar Roma pessoalmente...',
+  structure:   'Ex: O capítulo se divide em três movimentos: a condição humana (1-3), a justificação (4-5)...',
+  exegesis:    'Ex: O termo "justificação" (dikaiosis) aqui carrega sentido jurídico-forense...',
+  application: 'Ex: Se Deus já nos justificou, a culpa que sentimos não tem mais fundamento legal diante dele...',
 };
 
 // ─── Modal ──────────────────────────────────────────────────────────
@@ -67,7 +94,7 @@ export default function SermonEditorModal() {
   const [context,     setContext]     = useState('');
   const [structure,   setStructure]   = useState('');
   const [exegesis,    setExegesis]    = useState('');
-  const [outline,     setOutline]     = useState('');
+  const [outlineItems, setOutlineItems] = useState<SermonOutlineItem[]>([]);
   const [application, setApplication] = useState('');
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,8 +113,24 @@ export default function SermonEditorModal() {
       setContext(data.contextNotes ?? '');
       setStructure(data.structureNotes ?? '');
       setExegesis(data.exegesisNotes ?? '');
-      setOutline(data.outline ? JSON.stringify(data.outline, null, 2) : '');
       setApplication(data.applicationNotes ?? '');
+
+      // outline pode vir null, [] ou (de versões antigas) string — trata todos
+      const rawOutline: any = (data as any).outline;
+      if (Array.isArray(rawOutline)) {
+        setOutlineItems(rawOutline);
+      } else if (typeof rawOutline === 'string' && rawOutline.trim()) {
+        // Migração suave de texto livre antigo → 1 item por linha não vazia
+        setOutlineItems(
+          rawOutline.split('\n').filter(l => l.trim()).map(l => ({
+            id: newOutlineId(),
+            level: l.trim().startsWith('—') || l.trim().startsWith('-') ? 1 : 0,
+            text: l.replace(/^[—-]\s*/, '').trim(),
+          })),
+        );
+      } else {
+        setOutlineItems([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -96,6 +139,7 @@ export default function SermonEditorModal() {
   useEffect(() => { load(); }, [load]);
 
   // ── Auto-save ────────────────────────────────────────────────────
+  // FIX: outline agora está incluído no payload — antes era perdido.
 
   const triggerSave = useCallback(() => {
     if (!sermonId) return;
@@ -110,14 +154,47 @@ export default function SermonEditorModal() {
           structureNotes:   structure.trim()  || null,
           exegesisNotes:    exegesis.trim()   || null,
           applicationNotes: application.trim()|| null,
-        });
+          outline:          outlineItems.length > 0 ? outlineItems : null,   // ← FIX
+        } as any);
       } finally {
         setIsSaving(false);
       }
     }, 1500);
-  }, [sermonId, title, passageRef, context, structure, exegesis, application]);
+  }, [sermonId, title, passageRef, context, structure, exegesis, application, outlineItems]);
 
-  // ── Handlers ─────────────────────────────────────────────────────
+  // Salva automaticamente também quando o outline muda (antes só nos textos)
+  useEffect(() => { if (!isLoading) triggerSave(); }, [outlineItems]);
+
+  // ── Handlers de outline ───────────────────────────────────────────
+
+  const addOutlinePoint = (level: 0 | 1) => {
+    setOutlineItems(prev => [...prev, { id: newOutlineId(), level, text: '' }]);
+  };
+
+  const updateOutlineText = (id: string, text: string) => {
+    setOutlineItems(prev => prev.map(it => it.id === id ? { ...it, text } : it));
+  };
+
+  const removeOutlinePoint = (id: string) => {
+    setOutlineItems(prev => prev.filter(it => it.id !== id));
+  };
+
+  const moveOutlinePoint = (id: string, dir: -1 | 1) => {
+    setOutlineItems(prev => {
+      const idx = prev.findIndex(it => it.id === id);
+      const newIdx = idx + dir;
+      if (idx === -1 || newIdx < 0 || newIdx >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[idx], copy[newIdx]] = [copy[newIdx], copy[idx]];
+      return copy;
+    });
+  };
+
+  const toggleOutlineLevel = (id: string) => {
+    setOutlineItems(prev => prev.map(it => it.id === id ? { ...it, level: it.level === 0 ? 1 : 0 } : it));
+  };
+
+  // ── Outros handlers ────────────────────────────────────────────────
 
   const handleStatusChange = async (status: SermonStatus) => {
     if (!sermonId) return;
@@ -130,28 +207,33 @@ export default function SermonEditorModal() {
 
   const handleShare = async () => {
     if (!sermon) return;
+    const outlineText = outlineItems
+      .map(it => (it.level === 0 ? `${it.text}` : `   — ${it.text}`))
+      .join('\n');
     const parts = [
       `📖 ${title || 'Sem título'}`,
       passageRef  ? `Passagem: ${passageRef}` : '',
       context     ? `\nCONTEXTO\n${context}`     : '',
       structure   ? `\nESTRUTURA\n${structure}`   : '',
       exegesis    ? `\nEXEGESE\n${exegesis}`      : '',
-      outline     ? `\nOUTLINE\n${outline}`       : '',
+      outlineText ? `\nOUTLINE\n${outlineText}`   : '',
       application ? `\nAPLICAÇÃO\n${application}` : '',
       '\n— via Verbum',
     ].filter(Boolean).join('\n');
     await Share.share({ message: parts });
   };
 
+  // FIX: navega só com sermonId — o Modo Púlpito busca tudo sozinho
   const handleOpenPulpit = () => {
-    if (!sermon?.verses.length) {
-      Alert.alert('Sem versículos', 'Adicione versículos antes de usar o Modo Púlpito.');
+    const hasAnyContent =
+      (sermon?.verses.length ?? 0) > 0 || context.trim() || structure.trim() ||
+      exegesis.trim() || outlineItems.length > 0 || application.trim();
+
+    if (!hasAnyContent) {
+      Alert.alert('Sermão vazio', 'Adicione ao menos um versículo ou conteúdo antes de iniciar o Modo Púlpito.');
       return;
     }
-    const refs = sermon.verses.map(v => `${v.bookSlug}:${v.chapter}:${v.verse}`).join(',');
-    router.push(
-      `/(app)/modals/pulpit-mode?verseRefs=${encodeURIComponent(refs)}&title=${encodeURIComponent(title)}`,
-    );
+    router.push(`/(app)/modals/pulpit-mode?sermonId=${sermonId}`);
   };
 
   const handleRemoveVerse = async (verseId: string) => {
@@ -166,7 +248,7 @@ export default function SermonEditorModal() {
     context:     !!context.trim(),
     structure:   !!structure.trim(),
     exegesis:    !!exegesis.trim(),
-    outline:     !!outline.trim(),
+    outline:     outlineItems.length > 0,
     application: !!application.trim(),
   };
   const doneCount = Object.values(done).filter(Boolean).length;
@@ -183,18 +265,26 @@ export default function SermonEditorModal() {
     fontFamily: 'serif' as const,
   };
 
+  const SectionHelp = ({ tabKey }: { tabKey: Tab }) => (
+    <View style={{
+      paddingHorizontal: 20, paddingTop: 14, paddingBottom: 4,
+      flexDirection: 'row', gap: 8, alignItems: 'flex-start',
+    }}>
+      <MaterialCommunityIcons name="information-outline" size={14} color={tokens.textTertiary} style={{ marginTop: 1 }} />
+      <Text style={{ flex: 1, fontSize: 12, color: tokens.textTertiary, lineHeight: 17 }}>
+        {SECTION_HELP[tabKey]}
+      </Text>
+    </View>
+  );
+
   const renderPassage = () => (
     <ScrollView
       contentContainerStyle={{ padding: 20, gap: 24, paddingBottom: 48 }}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      {/* Referência */}
       <View style={{ gap: 8 }}>
-        <Text style={{
-          fontSize: 10, fontWeight: '700', color: tokens.textTertiary,
-          textTransform: 'uppercase', letterSpacing: 1,
-        }}>
+        <Text style={{ fontSize: 10, fontWeight: '700', color: tokens.textTertiary, textTransform: 'uppercase', letterSpacing: 1 }}>
           Referência da passagem
         </Text>
         <TextInput
@@ -202,29 +292,17 @@ export default function SermonEditorModal() {
           onChangeText={v => { setPassageRef(v); triggerSave(); }}
           placeholder="Ex: Romanos 8:28–39"
           placeholderTextColor={tokens.textDisabled}
-          style={{
-            fontSize: 18, fontWeight: '600', color: tokens.actionPrimary,
-            paddingBottom: 10,
-            borderBottomWidth: 1.5,
-            borderBottomColor: tokens.actionPrimary + '50',
-          }}
+          style={{ fontSize: 18, fontWeight: '600', color: tokens.actionPrimary, paddingBottom: 10, borderBottomWidth: 1.5, borderBottomColor: tokens.actionPrimary + '50' }}
           returnKeyType="done"
         />
       </View>
 
-      {/* Versículos */}
       <View style={{ gap: 10 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{
-            fontSize: 10, fontWeight: '700', color: tokens.textTertiary,
-            textTransform: 'uppercase', letterSpacing: 1,
-          }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: tokens.textTertiary, textTransform: 'uppercase', letterSpacing: 1 }}>
             Versículos da pregação
           </Text>
-          <View style={{
-            backgroundColor: tokens.actionPrimary + '20',
-            borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2,
-          }}>
+          <View style={{ backgroundColor: tokens.actionPrimary + '20', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
             <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.actionPrimary }}>
               {sermon?.verses.length ?? 0}
             </Text>
@@ -232,34 +310,18 @@ export default function SermonEditorModal() {
         </View>
 
         {(sermon?.verses.length ?? 0) === 0 ? (
-          <View style={{
-            backgroundColor: tokens.bgCard, borderRadius: 14, padding: 20,
-            borderWidth: 1, borderColor: tokens.borderLight,
-            alignItems: 'center', gap: 12,
-          }}>
+          <View style={{ backgroundColor: tokens.bgCard, borderRadius: 14, padding: 20, borderWidth: 1, borderColor: tokens.borderLight, alignItems: 'center', gap: 12 }}>
             <MaterialCommunityIcons name="book-plus-outline" size={36} color={tokens.iconMuted} />
             <Text style={{ fontSize: 14, color: tokens.textTertiary, textAlign: 'center', lineHeight: 22 }}>
-              No leitor, faça{' '}
-              <Text style={{ fontWeight: '700' }}>long press</Text>
-              {' '}em qualquer versículo e toque em{' '}
-              <Text style={{ fontWeight: '700', color: tokens.actionPrimary }}>{`"Adicionar ao sermão"`}</Text>
-              {' '}para vinculá-lo aqui.
+              No leitor, faça <Text style={{ fontWeight: '700' }}>long press</Text> em qualquer versículo e toque em{' '}
+              <Text style={{ fontWeight: '700', color: tokens.actionPrimary }}>{`"Adicionar ao sermão"`}</Text> para vinculá-lo aqui.
             </Text>
           </View>
         ) : (
           <View style={{ gap: 8 }}>
             {sermon!.verses.map(v => (
-              <View key={v.id} style={{
-                backgroundColor: tokens.bgCard, borderRadius: 14,
-                borderWidth: 1, borderColor: tokens.borderLight,
-                flexDirection: 'row', alignItems: 'flex-start',
-                padding: 14, gap: 12,
-              }}>
-                <View style={{
-                  width: 36, height: 36, borderRadius: 8, flexShrink: 0,
-                  backgroundColor: tokens.actionPrimary + '15',
-                  alignItems: 'center', justifyContent: 'center',
-                }}>
+              <View key={v.id} style={{ backgroundColor: tokens.bgCard, borderRadius: 14, borderWidth: 1, borderColor: tokens.borderLight, flexDirection: 'row', alignItems: 'flex-start', padding: 14, gap: 12 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0, backgroundColor: tokens.actionPrimary + '15', alignItems: 'center', justifyContent: 'center' }}>
                   <MaterialCommunityIcons name="book-open-variant" size={18} color={tokens.actionPrimary} />
                 </View>
                 <View style={{ flex: 1, gap: 4 }}>
@@ -284,28 +346,119 @@ export default function SermonEditorModal() {
   );
 
   const renderText = (value: string, setValue: (v: string) => void, key: Tab) => (
-    <TextInput
-      key={key}
-      value={value}
-      onChangeText={v => { setValue(v); triggerSave(); }}
-      multiline
-      placeholder={PLACEHOLDERS[key]}
-      placeholderTextColor={tokens.textDisabled}
-      autoFocus={false}
-      style={textInputStyle}
-    />
+    <View style={{ flex: 1 }}>
+      <SectionHelp tabKey={key} />
+      <TextInput
+        key={key}
+        value={value}
+        onChangeText={v => { setValue(v); triggerSave(); }}
+        multiline
+        placeholder={PLACEHOLDERS[key]}
+        placeholderTextColor={tokens.textDisabled}
+        style={textInputStyle}
+      />
+    </View>
+  );
+
+  // ── Outline — lista estruturada, não textarea ────────────────────
+
+  const renderOutline = () => (
+    <View style={{ flex: 1 }}>
+      <SectionHelp tabKey="outline" />
+      <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 8, gap: 10, paddingBottom: 100 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {outlineItems.length === 0 && (
+          <View style={{ backgroundColor: tokens.bgCard, borderRadius: 14, padding: 20, borderWidth: 1, borderColor: tokens.borderLight, alignItems: 'center', gap: 8 }}>
+            <MaterialCommunityIcons name="format-list-numbered" size={32} color={tokens.iconMuted} />
+            <Text style={{ fontSize: 13, color: tokens.textTertiary, textAlign: 'center' }}>
+              Nenhum ponto ainda. Adicione o primeiro ponto da sua pregação.
+            </Text>
+          </View>
+        )}
+
+        {outlineItems.map((item, idx) => {
+          const mainNumber = outlineItems.slice(0, idx + 1).filter(i => i.level === 0).length;
+          return (
+            <View key={item.id} style={{
+              flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+              marginLeft: item.level === 1 ? 28 : 0,
+            }}>
+              {/* Marcador */}
+              <TouchableOpacity onPress={() => toggleOutlineLevel(item.id)} style={{ paddingTop: 12 }}>
+                {item.level === 0 ? (
+                  <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: tokens.actionPrimary, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: tokens.actionPrimaryText }}>{mainNumber}</Text>
+                  </View>
+                ) : (
+                  <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+                    <MaterialCommunityIcons name="minus" size={16} color={tokens.textTertiary} />
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {/* Texto */}
+              <TextInput
+                value={item.text}
+                onChangeText={t => updateOutlineText(item.id, t)}
+                placeholder={item.level === 0 ? 'Ponto principal...' : 'Sub-ponto, ilustração...'}
+                placeholderTextColor={tokens.textDisabled}
+                multiline
+                style={{
+                  flex: 1, fontSize: item.level === 0 ? 15 : 14,
+                  fontWeight: item.level === 0 ? '700' : '400',
+                  color: item.level === 0 ? tokens.textPrimary : tokens.textSecondary,
+                  paddingVertical: 10, paddingHorizontal: 12,
+                  backgroundColor: tokens.bgCard, borderRadius: 10,
+                  borderWidth: 1, borderColor: tokens.borderLight,
+                }}
+              />
+
+              {/* Ações: mover + remover */}
+              <View style={{ gap: 2, paddingTop: 8 }}>
+                <TouchableOpacity onPress={() => moveOutlinePoint(item.id, -1)} disabled={idx === 0} style={{ opacity: idx === 0 ? 0.25 : 1, padding: 3 }}>
+                  <MaterialCommunityIcons name="chevron-up" size={16} color={tokens.iconMuted} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => moveOutlinePoint(item.id, 1)} disabled={idx === outlineItems.length - 1} style={{ opacity: idx === outlineItems.length - 1 ? 0.25 : 1, padding: 3 }}>
+                  <MaterialCommunityIcons name="chevron-down" size={16} color={tokens.iconMuted} />
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity onPress={() => removeOutlinePoint(item.id)} style={{ paddingTop: 10, paddingLeft: 2 }}>
+                <MaterialCommunityIcons name="close" size={16} color={tokens.iconMuted} />
+              </TouchableOpacity>
+            </View>
+          );
+        })}
+
+        {/* Botões de adicionar */}
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+          <TouchableOpacity
+            onPress={() => addOutlinePoint(0)}
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: tokens.actionPrimary + '15', borderRadius: 12, paddingVertical: 12, borderWidth: 1, borderColor: tokens.actionPrimary + '30' }}
+          >
+            <MaterialCommunityIcons name="plus" size={16} color={tokens.actionPrimary} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.actionPrimary }}>Ponto principal</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => addOutlinePoint(1)}
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: tokens.bgCard, borderRadius: 12, paddingVertical: 12, borderWidth: 1, borderColor: tokens.borderLight }}
+          >
+            <MaterialCommunityIcons name="plus" size={16} color={tokens.textSecondary} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.textSecondary }}>Sub-ponto</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 
   const renderContent = () => {
     if (tab === 'passage') return renderPassage();
-    const map: Record<Exclude<Tab,'passage'>, [string, (v:string)=>void]> = {
+    if (tab === 'outline') return renderOutline();
+    const map: Record<'context' | 'structure' | 'exegesis' | 'application', [string, (v: string) => void]> = {
       context:     [context,     setContext],
       structure:   [structure,   setStructure],
       exegesis:    [exegesis,    setExegesis],
-      outline:     [outline,     setOutline],
       application: [application, setApplication],
     };
-    const [val, setter] = map[tab as Exclude<Tab,'passage'>];
+    const [val, setter] = map[tab as 'context' | 'structure' | 'exegesis' | 'application'];
     return renderText(val, setter, tab);
   };
 
@@ -322,20 +475,11 @@ export default function SermonEditorModal() {
   // ── Render ───────────────────────────────────────────────────────
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: tokens.bgPrimary }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      {/* ── HEADER — paddingTop: 8 (sem insets, já está sob o AppHeader) ── */}
-      <View style={{
-        paddingTop:        8,
-        paddingHorizontal: 16,
-        paddingBottom:     10,
-        borderBottomWidth: 1,
-        borderBottomColor: tokens.borderLight,
-        gap:               8,
-      }}>
-        {/* Linha 1: voltar + título + ações */}
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: tokens.bgPrimary }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+
+      {/* ── HEADER ── */}
+      <View style={{ paddingTop: 8, paddingHorizontal: 16, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: tokens.borderLight, gap: 10 }}>
+
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
             <MaterialCommunityIcons name="arrow-left" size={22} color={tokens.iconPrimary} />
@@ -346,25 +490,30 @@ export default function SermonEditorModal() {
             onChangeText={v => { setTitle(v); triggerSave(); }}
             placeholder="Título do sermão"
             placeholderTextColor={tokens.textDisabled}
-            style={{
-              flex: 1, fontSize: 15, fontWeight: '700',
-              color: tokens.textPrimary,
-            }}
+            style={{ flex: 1, fontSize: 15, fontWeight: '700', color: tokens.textPrimary }}
             returnKeyType="done"
           />
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            {isSaving && <ActivityIndicator size="small" color={tokens.textDisabled} style={{ marginRight: 4 }} />}
-            <TouchableOpacity onPress={handleOpenPulpit} style={{ padding: 8 }}>
-              <MaterialCommunityIcons name="presentation-play" size={22} color={tokens.actionPrimary} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleShare} style={{ padding: 8 }}>
-              <MaterialCommunityIcons name="share-variant-outline" size={20} color={tokens.iconPrimary} />
-            </TouchableOpacity>
-          </View>
+          {isSaving && <ActivityIndicator size="small" color={tokens.textDisabled} />}
+
+          <TouchableOpacity onPress={handleShare} style={{ padding: 8 }}>
+            <MaterialCommunityIcons name="share-variant-outline" size={20} color={tokens.iconPrimary} />
+          </TouchableOpacity>
         </View>
 
-        {/* Linha 2: status + progresso */}
+        {/* Botão de iniciar o púlpito — agora é um pill com gradiente, não um ícone solto */}
+        <TouchableOpacity onPress={handleOpenPulpit} style={{ borderRadius: 12, overflow: 'hidden' }}>
+          <LinearGradient
+            colors={['#6D28D9', '#8B5CF6']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 11 }}
+          >
+            <MaterialCommunityIcons name="presentation-play" size={18} color="white" />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: 'white' }}>Iniciar Modo Púlpito</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Status + progresso */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {(['draft', 'ready', 'preached'] as SermonStatus[]).map(st => {
             const active = sermon?.status === st;
@@ -373,12 +522,7 @@ export default function SermonEditorModal() {
               <TouchableOpacity
                 key={st}
                 onPress={() => handleStatusChange(st)}
-                style={{
-                  paddingVertical: 5, paddingHorizontal: 12,
-                  borderRadius: 14,
-                  backgroundColor: active ? color : 'transparent',
-                  borderWidth: 1, borderColor: color,
-                }}
+                style={{ paddingVertical: 5, paddingHorizontal: 12, borderRadius: 14, backgroundColor: active ? color : 'transparent', borderWidth: 1, borderColor: color }}
               >
                 <Text style={{ fontSize: 12, fontWeight: '600', color: active ? 'white' : color }}>
                   {SERMON_STATUS_LABELS[st]}
@@ -390,10 +534,7 @@ export default function SermonEditorModal() {
           <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <View style={{ flexDirection: 'row', gap: 4 }}>
               {TABS.map(t => (
-                <View key={t.key} style={{
-                  width: 6, height: 6, borderRadius: 3,
-                  backgroundColor: done[t.key] ? tokens.success : tokens.borderMedium,
-                }} />
+                <View key={t.key} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: done[t.key] ? tokens.success : tokens.borderMedium }} />
               ))}
             </View>
             <Text style={{ fontSize: 11, color: tokens.textTertiary }}>
@@ -403,65 +544,32 @@ export default function SermonEditorModal() {
         </View>
       </View>
 
-      {/* ── ABAS — colada logo abaixo do header ── */}
+      {/* ── ABAS ── */}
       <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        bounces={false}
-        style={{
-          borderBottomWidth: 1,
-          borderBottomColor: tokens.borderLight,
-          flexGrow: 0,          // não cresce além da altura natural
-          flexShrink: 0,        // não encolhe
-        }}
+        horizontal showsHorizontalScrollIndicator={false} bounces={false}
+        style={{ borderBottomWidth: 1, borderBottomColor: tokens.borderLight, flexGrow: 0, flexShrink: 0 }}
         contentContainerStyle={{ paddingHorizontal: 6 }}
       >
         {TABS.map(t => {
-          const active   = tab === t.key;
-          const isDone   = done[t.key];
+          const active = tab === t.key;
+          const isDone = done[t.key];
           return (
             <TouchableOpacity
               key={t.key}
               onPress={() => setTab(t.key)}
-              style={{
-                flexDirection:    'row',
-                alignItems:       'center',
-                gap:              5,
-                paddingVertical:  10,
-                paddingHorizontal: 10,
-                borderBottomWidth: active ? 2.5 : 0,
-                borderBottomColor: tokens.actionPrimary,
-                marginBottom:     -1,
-              }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 10, paddingHorizontal: 10, borderBottomWidth: active ? 2.5 : 0, borderBottomColor: tokens.actionPrimary, marginBottom: -1 }}
             >
-              <MaterialCommunityIcons
-                name={t.icon}
-                size={14}
-                color={
-                  active  ? tokens.actionPrimary :
-                  isDone  ? tokens.success :
-                  tokens.iconMuted
-                }
-              />
-              <Text style={{
-                fontSize:   13,
-                fontWeight: active ? '700' : '400',
-                color:
-                  active  ? tokens.actionPrimary :
-                  isDone  ? tokens.textSecondary :
-                  tokens.textTertiary,
-              }}>
+              <MaterialCommunityIcons name={t.icon} size={14} color={active ? tokens.actionPrimary : isDone ? tokens.success : tokens.iconMuted} />
+              <Text style={{ fontSize: 13, fontWeight: active ? '700' : '400', color: active ? tokens.actionPrimary : isDone ? tokens.textSecondary : tokens.textTertiary }}>
                 {t.label}
               </Text>
-              {isDone && !active && (
-                <MaterialCommunityIcons name="check-circle" size={11} color={tokens.success} />
-              )}
+              {isDone && !active && <MaterialCommunityIcons name="check-circle" size={11} color={tokens.success} />}
             </TouchableOpacity>
           );
         })}
       </ScrollView>
 
-      {/* ── CONTEÚDO — ocupa o espaço restante ── */}
+      {/* ── CONTEÚDO ── */}
       <View style={{ flex: 1 }}>
         {renderContent()}
       </View>

@@ -1,7 +1,11 @@
 /**
- * VERBUM — app/(app)/plans.tsx  [REFINADO]
+ * VERBUM — app/(app)/plans.tsx  [POLISH — mesmo padrão visual da home]
  *
- * Fix: botão "Criar plano de estudo" centralizado e estado vazio polido.
+ * Aplica o mesmo princípio usado no redesign da home:
+ *   - Card de destaque (plano ativo) com gradiente, não cor chapada
+ *   - Ícones com fundo em gradiente sutil, não cor sólida flat
+ *   - Estatísticas agrupadas num único card com divisores,
+ *     em vez de blocos soltos
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -10,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router }            from 'expo-router';
+import { LinearGradient }    from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme }       from '../../src/context/ThemeContext';
@@ -42,6 +47,7 @@ export default function PlansScreen() {
   useEffect(() => { load(); }, [load]);
 
   const completedPlans = allPlans.filter(p => p.isCompleted);
+  const pausedPlans    = allPlans.filter(p => !p.isCompleted && p.id !== activePlan?.id);
   const hasPlans       = allPlans.length > 0;
 
   // ── Render ────────────────────────────────────────────────────
@@ -63,7 +69,7 @@ export default function PlansScreen() {
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingBottom:     insets.bottom + 40,
-          flexGrow:          1,        // ← garante que o empty state preenche a tela
+          flexGrow:          1,
         }}
 
         // ── HEADER ──────────────────────────────────────────────
@@ -72,100 +78,131 @@ export default function PlansScreen() {
             <Text style={{ fontSize: 24, fontWeight: '800', color: tokens.textPrimary, letterSpacing: -0.5 }}>
               Planos de Leitura
             </Text>
-            <Text style={{ fontSize: 14, color: tokens.textTertiary, marginTop: 4 }}>
-              {hasPlans
-                ? `${allPlans.length} plano${allPlans.length > 1 ? 's' : ''} · ${completedPlans.length} concluído${completedPlans.length !== 1 ? 's' : ''}`
-                : 'Organize sua leitura da Bíblia'}
-            </Text>
+
+            {hasPlans ? (
+              // Stats com divisores — mesmo padrão do card "Seu progresso" da home
+              <View style={{
+                flexDirection: 'row', marginTop: 16,
+                backgroundColor: tokens.bgCard, borderRadius: 16,
+                borderWidth: 1, borderColor: tokens.borderLight, overflow: 'hidden',
+              }}>
+                {[
+                  { icon: 'calendar-multiple' as const, value: String(allPlans.length),      label: 'planos',     color: tokens.actionPrimary },
+                  { icon: 'check-circle-outline' as const, value: String(completedPlans.length), label: 'concluídos', color: '#10B981' },
+                  { icon: 'pause-circle-outline' as const, value: String(pausedPlans.length),    label: 'pausados',   color: '#F59E0B' },
+                ].map((s, i) => (
+                  <View key={s.label} style={{
+                    flex: 1, alignItems: 'center', gap: 5, paddingVertical: 16,
+                    borderRightWidth: i < 2 ? 1 : 0, borderRightColor: tokens.borderLight,
+                  }}>
+                    <MaterialCommunityIcons name={s.icon} size={18} color={s.color} />
+                    <Text style={{ fontSize: 17, fontWeight: '800', color: tokens.textPrimary }}>{s.value}</Text>
+                    <Text style={{ fontSize: 10.5, color: tokens.textTertiary }}>{s.label}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={{ fontSize: 14, color: tokens.textTertiary, marginTop: 4 }}>
+                Organize sua leitura da Bíblia
+              </Text>
+            )}
+
+            {hasPlans && (
+              <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.textTertiary, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 24, marginBottom: 4 }}>
+                Todos os planos
+              </Text>
+            )}
           </View>
         )}
 
-        // ── PLANO ATIVO (card de destaque) ──────────────────────
-        ListHeaderComponentStyle={{ marginBottom: 0 }}
-
         renderItem={({ item: plan }) => {
-          const isActive   = plan.id === activePlan?.id;
-          const progress   = isActive ? percentComplete : 0;
-          const statusColor = plan.isCompleted
-            ? tokens.success
-            : isActive
-            ? tokens.actionPrimary
-            : tokens.textTertiary;
+          const isActive = plan.id === activePlan?.id;
+          const progress = isActive ? percentComplete : plan.isCompleted ? 100 : 0;
+
+          // ── Card do plano ATIVO — gradiente, igual ao hero da home ──
+          if (isActive) {
+            return (
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: '/(app)/modals/plan-detail' as any, params: { planId: plan.id } })}
+                activeOpacity={0.92}
+                style={{ borderRadius: 20, overflow: 'hidden', marginBottom: 14 }}
+              >
+                <LinearGradient
+                  colors={['#4C1D95', '#6D28D9', '#8B5CF6']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{ padding: 20 }}
+                >
+                  {/* Luzes decorativas — mesmo efeito do card de versículo */}
+                  <View pointerEvents="none" style={{ position: 'absolute', top: -40, right: -30, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+                  <MaterialCommunityIcons name="calendar-check" size={100} color="rgba(255,255,255,0.07)" style={{ position: 'absolute', bottom: -10, right: -6 }} />
+
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.7)' }} />
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.7)', letterSpacing: 1, textTransform: 'uppercase' }}>
+                          Plano ativo
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: 'white', lineHeight: 22 }}>
+                        {plan.name}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>
+                        Iniciado {relativeDate(plan.createdAt)}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 26, fontWeight: '800', color: 'white' }}>
+                      {Math.round(progress)}%
+                    </Text>
+                  </View>
+
+                  <View style={{ height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden', marginBottom: 10 }}>
+                    <View style={{ height: '100%', width: `${Math.min(100, progress)}%`, borderRadius: 4, backgroundColor: 'white' }} />
+                  </View>
+
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
+                    {plan.totalChapters} capítulos · {plan.bibleVersion.toUpperCase()}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            );
+          }
+
+          // ── Demais cards — clean, com ícone em gradiente sutil ──
+          const statusColor = plan.isCompleted ? '#10B981' : '#F59E0B';
+          const statusIcon  = plan.isCompleted ? 'check-circle' as const : 'pause-circle-outline' as const;
+          const statusLabel = plan.isCompleted ? 'Concluído' : 'Pausado';
 
           return (
             <TouchableOpacity
               onPress={() => router.push({ pathname: '/(app)/modals/plan-detail' as any, params: { planId: plan.id } })}
+              activeOpacity={0.85}
               style={{
-                backgroundColor: isActive ? tokens.actionPrimary : tokens.bgCard,
-                borderRadius:    16,
-                padding:         18,
-                marginBottom:    12,
-                borderWidth:     1,
-                borderColor:     isActive ? 'transparent' : tokens.borderLight,
+                flexDirection: 'row', alignItems: 'center', gap: 14,
+                backgroundColor: tokens.bgCard, borderRadius: 16, padding: 16,
+                marginBottom: 12, borderWidth: 1, borderColor: tokens.borderLight,
               }}
             >
-              {/* Cabeçalho do card */}
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{
-                    fontSize: 15, fontWeight: '700',
-                    color: isActive ? tokens.actionPrimaryText : tokens.textPrimary,
-                    lineHeight: 22,
-                  }}>
-                    {plan.name}
-                  </Text>
-                  <Text style={{
-                    fontSize: 12,
-                    color: isActive ? tokens.actionPrimaryText + 'AA' : tokens.textTertiary,
-                    marginTop: 2,
-                  }}>
-                    {plan.isCompleted
-                      ? `Concluído ${relativeDate(plan.completedAt ?? plan.updatedAt)}`
-                      : isActive
-                      ? `Iniciado ${relativeDate(plan.createdAt)}`
-                      : `Criado ${relativeDate(plan.createdAt)}`}
-                  </Text>
-                </View>
-                <View style={{
-                  paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
-                  backgroundColor: plan.isCompleted
-                    ? tokens.successBg
-                    : isActive
-                    ? 'rgba(255,255,255,0.2)'
-                    : tokens.bgSecondary,
-                }}>
-                  <Text style={{
-                    fontSize: 11, fontWeight: '700',
-                    color: plan.isCompleted ? tokens.success : isActive ? 'white' : tokens.textTertiary,
-                  }}>
-                    {plan.isCompleted ? 'Concluído' : isActive ? 'Ativo' : 'Pausado'}
-                  </Text>
-                </View>
+              <LinearGradient
+                colors={[statusColor + '30', statusColor + '12']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <MaterialCommunityIcons name={statusIcon} size={20} color={statusColor} />
+              </LinearGradient>
+
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary }} numberOfLines={1}>
+                  {plan.name}
+                </Text>
+                <Text style={{ fontSize: 11, color: tokens.textTertiary, marginTop: 2 }}>
+                  {statusLabel} · {plan.totalChapters} capítulos
+                </Text>
               </View>
 
-              {/* Barra de progresso */}
-              <View style={{ gap: 6 }}>
-                <View style={{
-                  height: 6, borderRadius: 3,
-                  backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : tokens.progressBg,
-                  overflow: 'hidden',
-                }}>
-                  <View style={{
-                    height: '100%',
-                    width: `${Math.min(100, isActive ? progress : (plan.isCompleted ? 100 : 0))}%`,
-                    borderRadius: 3,
-                    backgroundColor: isActive ? 'white' : statusColor,
-                  }} />
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ fontSize: 11, color: isActive ? tokens.actionPrimaryText + 'AA' : tokens.textTertiary }}>
-                    {plan.totalChapters} capítulos · {plan.bibleVersion.toUpperCase()}
-                  </Text>
-                  <Text style={{ fontSize: 11, fontWeight: '600', color: isActive ? 'white' : statusColor }}>
-                    {isActive ? `${Math.round(progress)}%` : plan.isCompleted ? '100%' : '—'}
-                  </Text>
-                </View>
-              </View>
+              <MaterialCommunityIcons name="chevron-right" size={18} color={tokens.iconMuted} />
             </TouchableOpacity>
           );
         }}
@@ -173,19 +210,17 @@ export default function PlansScreen() {
         // ── ESTADO VAZIO ────────────────────────────────────────
         ListEmptyComponent={() => (
           <View style={{
-            flex:            1,
-            alignItems:      'center',
-            justifyContent:  'center',
-            paddingVertical: 60,
-            gap:             20,
+            flex: 1, alignItems: 'center', justifyContent: 'center',
+            paddingVertical: 60, gap: 20,
           }}>
-            <View style={{
-              width: 80, height: 80, borderRadius: 40,
-              backgroundColor: tokens.actionPrimary + '15',
-              alignItems: 'center', justifyContent: 'center',
-            }}>
+            <LinearGradient
+              colors={[tokens.actionPrimary + '30', tokens.actionPrimary + '10']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center' }}
+            >
               <MaterialCommunityIcons name="calendar-blank-outline" size={38} color={tokens.actionPrimary} />
-            </View>
+            </LinearGradient>
 
             <View style={{ alignItems: 'center', gap: 8 }}>
               <Text style={{ fontSize: 18, fontWeight: '700', color: tokens.textPrimary, textAlign: 'center' }}>
@@ -196,19 +231,12 @@ export default function PlansScreen() {
               </Text>
             </View>
 
-            {/* ← BOTÃO CENTRALIZADO */}
             <TouchableOpacity
               onPress={() => router.push('/(app)/modals/create-plan')}
               style={{
-                backgroundColor:  tokens.actionPrimary,
-                borderRadius:     14,
-                paddingVertical:  14,
-                paddingHorizontal: 32,
-                alignSelf:        'center',     // ← garante centralização
-                flexDirection:    'row',
-                alignItems:       'center',
-                gap:              8,
-                marginTop:        4,
+                backgroundColor: tokens.actionPrimary, borderRadius: 14,
+                paddingVertical: 14, paddingHorizontal: 32, alignSelf: 'center',
+                flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4,
               }}
             >
               <MaterialCommunityIcons name="plus" size={20} color={tokens.actionPrimaryText} />
@@ -220,26 +248,17 @@ export default function PlansScreen() {
         )}
       />
 
-      {/* FAB — quando já existem planos */}
+      {/* FAB */}
       {hasPlans && (
         <TouchableOpacity
           onPress={() => router.push('/(app)/modals/create-plan')}
           style={{
-            position:        'absolute',
-            bottom:          insets.bottom + 20,
-            right:           20,
-            backgroundColor: tokens.actionPrimary,
-            borderRadius:    28,
-            paddingVertical: 14,
-            paddingHorizontal: 22,
-            flexDirection:   'row',
-            alignItems:      'center',
-            gap:             8,
-            shadowColor:     tokens.shadow,
-            shadowOffset:    { width: 0, height: 4 },
-            shadowOpacity:   0.25,
-            shadowRadius:    8,
-            elevation:       8,
+            position: 'absolute', bottom: insets.bottom + 20, right: 20,
+            backgroundColor: tokens.actionPrimary, borderRadius: 28,
+            paddingVertical: 14, paddingHorizontal: 22,
+            flexDirection: 'row', alignItems: 'center', gap: 8,
+            shadowColor: tokens.shadow, shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.25, shadowRadius: 8, elevation: 8,
           }}
         >
           <MaterialCommunityIcons name="plus" size={20} color={tokens.actionPrimaryText} />

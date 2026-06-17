@@ -1,17 +1,28 @@
 /**
- * VERBUM — app/(app)/index.tsx  [REDESENHADO]
+ * VERBUM — app/(app)/index.tsx  [REDESIGN — inspirado no YouVersion]
  *
- * Hierarquia visual:
- *   1. Hero: saudação + data + streak
- *   2. Versículo do dia — destaque total
- *   3. Leitura de hoje / Empty state
- *   4. Acesso rápido às ferramentas
- *   5. Métricas resumidas
+ * Referência de pesquisa: o "Bible App" (YouVersion), o app bíblico mais
+ * usado do mundo, usa um card de "Versículo do Dia" grande e fotográfico
+ * como elemento central da home — tipografia serifada, texto branco,
+ * fundo com profundidade visual. É o que dá a sensação de calma e
+ * cuidado no primeiro contato, em vez de parecer um dashboard técnico.
+ *
+ * Adaptação para o Verbum:
+ *   Em vez de uma foto do Unsplash (que quebraria a promessa de
+ *   funcionar 100% offline), usamos um gradiente premium com leves
+ *   "luzes" decorativas — mesmo efeito de profundidade, sem dependência
+ *   de rede.
+ *
+ * Resultado: 1 elemento central bonito + no máximo 1 decisão por tela.
+ *
+ * Requer: expo-linear-gradient
+ *   npx expo install expo-linear-gradient   (caso ainda não esteja instalado)
  */
 
 import { ScrollView, View, Text, TouchableOpacity, RefreshControl } from 'react-native';
 import { useState, useCallback } from 'react';
 import { router }                from 'expo-router';
+import { LinearGradient }        from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme }       from '../../src/context/ThemeContext';
@@ -20,15 +31,13 @@ import { usePlanContext } from '../../src/context/PlanContext';
 import { useStreak }      from '../../src/hooks/useStreak';
 import { TodayPlanCard }  from '../../src/components/home/TodayPlanCard';
 
-// ─── Versículo do dia (fixo por enquanto — pode vir de uma API futuramente) ──
 const DAILY_VERSE = {
   reference: 'Josué 1:8',
-  text: 'Não se aparte da tua boca o livro desta lei; antes medita nele dia e noite, para que guardes e cumpras tudo o que nele está escrito.',
+  text: 'Não se aparte da tua boca o livro desta lei; antes medita nele dia e noite.',
   bookSlug: 'js',
   chapter: 1,
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────
 function greeting() {
   const h = new Date().getHours();
   if (h < 12) return 'Bom dia';
@@ -36,24 +45,20 @@ function greeting() {
   return 'Boa noite';
 }
 
-function todayFormatted() {
-  return new Date().toLocaleDateString('pt-BR', {
-    weekday: 'long', day: 'numeric', month: 'long',
-  });
+function todayLabel() {
+  return new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-// ─── Acesso rápido ───────────────────────────────────────────────
-const QUICK_ACTIONS = [
-  { label: 'Bíblia',    icon: 'book-open-outline'          as const, href: '/(app)/reader'                      as const, color: '#6366F1' },
-  { label: 'Sermões',   icon: 'notebook-outline'            as const, href: '/(app)/modals/sermon-list'          as const, color: '#8B5CF6' },
-  { label: 'Pesquisar', icon: 'magnify'                     as const, href: '/(app)/modals/search'               as const, color: '#06B6D4' },
-  { label: 'Profecias', icon: 'arrow-collapse-right'        as const, href: '/(app)/modals/prophetic-connections' as const, color: '#10B981' },
+const TOOLS = [
+  { label: 'Bíblia',    icon: 'book-open-page-variant-outline' as const, href: '/(app)/modals/chapter-reader?bookSlug=gn&chapter=1' as const, color: '#6366F1' },
+  { label: 'Sermões',   icon: 'notebook-outline'                as const, href: '/(app)/modals/sermon-list'                          as const, color: '#8B5CF6' },
+  { label: 'Buscar',    icon: 'magnify'                         as const, href: '/(app)/modals/search'                                as const, color: '#06B6D4' },
+  { label: 'Profecias', icon: 'arrow-collapse-right'            as const, href: '/(app)/modals/prophetic-connections'                  as const, color: '#10B981' },
 ];
 
-// ─── Componente principal ────────────────────────────────────────
 export default function HomeScreen() {
-  const { tokens, isDark } = useTheme();
-  const { user }           = useAuthContext();
+  const { tokens } = useTheme();
+  const { user }   = useAuthContext();
   const {
     activePlan, todaySchedule, readChapterIds,
     chaptersRead, percentComplete,
@@ -74,98 +79,110 @@ export default function HomeScreen() {
       style={{ flex: 1, backgroundColor: tokens.bgPrimary }}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={tokens.actionPrimary}
-        />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.actionPrimary} />
       }
-      contentContainerStyle={{ paddingTop: 8, paddingBottom: 48 }}
+      contentContainerStyle={{ paddingBottom: 48 }}
     >
 
-      {/* ── 1. HERO ────────────────────────────────────────────── */}
-      <View style={{ paddingHorizontal: 20, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-        {/* Avatar */}
-        <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: tokens.actionPrimary, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 20, fontWeight: '700', color: tokens.actionPrimaryText }}>
-            {firstName.charAt(0).toUpperCase()}
-          </Text>
-        </View>
-
-        {/* Saudação + data */}
-        <View style={{ flex: 1 }}>
+      {/* ── Header minimalista — fica por cima do card, discreto ── */}
+      <View style={{
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
+      }}>
+        <View>
           <Text style={{ fontSize: 13, color: tokens.textTertiary, textTransform: 'capitalize' }}>
-            {todayFormatted()}
+            {todayLabel()}
           </Text>
-          <Text style={{ fontSize: 19, fontWeight: '700', color: tokens.textPrimary, letterSpacing: -0.3 }}>
-            {greeting()}, {firstName} 👋
+          <Text style={{ fontSize: 18, fontWeight: '700', color: tokens.textPrimary }}>
+            {greeting()}, {firstName}
           </Text>
         </View>
 
-        {/* Streak badge */}
         {currentStreak > 0 && (
-          <View style={{ alignItems: 'center', backgroundColor: tokens.warningBg, borderRadius: 14, paddingVertical: 8, paddingHorizontal: 12, gap: 2 }}>
-            <Text style={{ fontSize: 18 }}>🔥</Text>
-            <Text style={{ fontSize: 12, fontWeight: '800', color: tokens.warningText }}>
-              {currentStreak}
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: tokens.warningBg, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12 }}>
+            <Text style={{ fontSize: 14 }}>🔥</Text>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.warningText }}>{currentStreak}</Text>
           </View>
         )}
       </View>
 
-      {/* ── 2. VERSÍCULO DO DIA ────────────────────────────────── */}
+      {/* ── HERO: Versículo do Dia — card central, estilo editorial ── */}
       <TouchableOpacity
         onPress={() => router.push(`/(app)/modals/chapter-reader?bookSlug=${DAILY_VERSE.bookSlug}&chapter=${DAILY_VERSE.chapter}`)}
-        activeOpacity={0.88}
-        style={{
-          marginHorizontal: 16,
-          marginBottom: 20,
-          backgroundColor: tokens.actionPrimary,
-          borderRadius: 20,
-          padding: 22,
-          gap: 14,
-        }}
+        activeOpacity={0.92}
+        style={{ marginHorizontal: 16, marginBottom: 28, borderRadius: 28, overflow: 'hidden' }}
       >
-        {/* Label */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.6)' }} />
-          <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.7)', letterSpacing: 1.5, textTransform: 'uppercase' }}>
+        <LinearGradient
+          colors={['#4C1D95', '#6D28D9', '#8B5CF6']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ minHeight: 280, padding: 28, justifyContent: 'space-between' }}
+        >
+          {/* Luzes decorativas — simulam profundidade sem precisar de foto */}
+          <View pointerEvents="none" style={{
+            position: 'absolute', top: -60, right: -50,
+            width: 220, height: 220, borderRadius: 110,
+            backgroundColor: 'rgba(255,255,255,0.08)',
+          }} />
+          <View pointerEvents="none" style={{
+            position: 'absolute', bottom: -80, left: -40,
+            width: 200, height: 200, borderRadius: 100,
+            backgroundColor: 'rgba(255,255,255,0.06)',
+          }} />
+          <MaterialCommunityIcons
+            name="format-quote-open"
+            size={140}
+            color="rgba(255,255,255,0.07)"
+            style={{ position: 'absolute', top: 8, left: 8 }}
+          />
+
+          {/* Label superior */}
+          <Text style={{
+            fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.65)',
+            letterSpacing: 2, textTransform: 'uppercase',
+          }}>
             Versículo do dia
           </Text>
-        </View>
 
-        {/* Texto */}
-        <Text style={{ fontSize: 17, color: 'white', lineHeight: 28, fontFamily: 'serif', fontStyle: 'italic', letterSpacing: 0.1 }}>
-         {`"${DAILY_VERSE.text}"`}
-        </Text>
-
-        {/* Referência + ação */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.8)' }}>
-            {DAILY_VERSE.reference}
+          {/* Texto — tipografia editorial, centro visual do card */}
+          <Text style={{
+            fontSize: 21, color: 'white', lineHeight: 32,
+            fontFamily: 'serif', fontStyle: 'italic', fontWeight: '500',
+            textAlign: 'center', marginVertical: 12,
+          }}>
+            "{DAILY_VERSE.text}"
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12 }}>
-            <Text style={{ fontSize: 12, color: 'white', fontWeight: '600' }}>Ler capítulo</Text>
-            <MaterialCommunityIcons name="arrow-right" size={14} color="white" />
+
+          {/* Rodapé do card */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.85)', letterSpacing: 0.3 }}>
+              {DAILY_VERSE.reference}
+            </Text>
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+              backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 20,
+              paddingVertical: 7, paddingHorizontal: 14,
+            }}>
+              <Text style={{ fontSize: 12, color: 'white', fontWeight: '600' }}>Ler capítulo</Text>
+              <MaterialCommunityIcons name="arrow-right" size={13} color="white" />
+            </View>
           </View>
-        </View>
+        </LinearGradient>
       </TouchableOpacity>
 
-      {/* ── 3. LEITURA DE HOJE ─────────────────────────────────── */}
-      <View style={{ marginBottom: 20 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 12 }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: tokens.textPrimary }}>
-            {activePlan ? 'Leitura de hoje' : 'Sem plano ativo'}
-          </Text>
-          {activePlan && (
+      {/* ── Conteúdo abaixo: uma única decisão por vez ── */}
+      {activePlan ? (
+        <View style={{ marginBottom: 28 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 12 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: tokens.textPrimary }}>
+              Leitura de hoje
+            </Text>
             <TouchableOpacity onPress={() => router.push('/(app)/plans')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text style={{ fontSize: 13, color: tokens.actionPrimary, fontWeight: '600' }}>Ver plano</Text>
               <MaterialCommunityIcons name="chevron-right" size={16} color={tokens.actionPrimary} />
             </TouchableOpacity>
-          )}
-        </View>
+          </View>
 
-        {activePlan ? (
           <TodayPlanCard
             planName={activePlan.name}
             schedule={todaySchedule}
@@ -175,89 +192,103 @@ export default function HomeScreen() {
               router.push(`/(app)/modals/chapter-reader?bookSlug=${slug}&chapter=${ch}`)
             }
           />
-        ) : (
-          /* Empty state elegante */
+        </View>
+      ) : (
+        <View style={{ marginHorizontal: 16, marginBottom: 28 }}>
           <TouchableOpacity
             onPress={() => router.push('/(app)/modals/create-plan')}
             activeOpacity={0.85}
             style={{
-              marginHorizontal: 16,
-              borderRadius: 18,
-              borderWidth: 1.5,
-              borderColor: tokens.borderMedium,
-              borderStyle: 'dashed',
-              padding: 28,
+              backgroundColor: tokens.bgCard,
+              borderRadius: 20,
+              padding: 24,
               alignItems: 'center',
               gap: 10,
+              borderWidth: 1,
+              borderColor: tokens.borderLight,
             }}
           >
-            <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: tokens.actionPrimary + '15', alignItems: 'center', justifyContent: 'center' }}>
-              <MaterialCommunityIcons name="calendar-plus" size={26} color={tokens.actionPrimary} />
+            <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: tokens.actionPrimary + '15', alignItems: 'center', justifyContent: 'center' }}>
+              <MaterialCommunityIcons name="calendar-heart" size={24} color={tokens.actionPrimary} />
             </View>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: tokens.textPrimary }}>Criar plano de leitura</Text>
-            <Text style={{ fontSize: 13, color: tokens.textTertiary, textAlign: 'center', lineHeight: 20 }}>
-              Organize sua leitura da Bíblia e acompanhe seu progresso dia a dia.
+            <Text style={{ fontSize: 15, fontWeight: '700', color: tokens.textPrimary }}>
+              Comece sua leitura hoje
             </Text>
-            <View style={{ backgroundColor: tokens.actionPrimary, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 28, marginTop: 4 }}>
+            <Text style={{ fontSize: 13, color: tokens.textTertiary, textAlign: 'center', lineHeight: 19, maxWidth: 260 }}>
+              Crie um plano simples e leia a Bíblia no seu ritmo, com lembretes gentis.
+            </Text>
+            <View style={{ backgroundColor: tokens.actionPrimary, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 26, marginTop: 6 }}>
               <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.actionPrimaryText }}>Criar meu plano</Text>
             </View>
           </TouchableOpacity>
-        )}
-      </View>
+        </View>
+      )}
 
-      {/* ── 4. ACESSO RÁPIDO ───────────────────────────────────── */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-        <Text style={{ fontSize: 16, fontWeight: '700', color: tokens.textPrimary, marginBottom: 12 }}>
+      {/* ── FERRAMENTAS — grid com profundidade visual ── */}
+      <View style={{ paddingHorizontal: 20, marginBottom: 28 }}>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: tokens.textPrimary, marginBottom: 14 }}>
           Ferramentas
         </Text>
-        {/* Grid 2x2 */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          {QUICK_ACTIONS.map(action => (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+          {TOOLS.map(tool => (
             <TouchableOpacity
-              key={action.label}
-              onPress={() => router.push(action.href as any)}
-              activeOpacity={0.8}
+              key={tool.label}
+              onPress={() => router.push(tool.href as any)}
+              activeOpacity={0.85}
               style={{
-                width: '47.5%',          // ← duas colunas com gap de 10
+                width: '47%',
                 backgroundColor: tokens.bgCard,
-                borderRadius: 16,
-                padding: 18,
-                alignItems: 'flex-start',
-                gap: 10,
+                borderRadius: 18,
+                padding: 16,
+                gap: 12,
                 borderWidth: 1,
                 borderColor: tokens.borderLight,
               }}
             >
-              <View style={{
-                width: 44, height: 44, borderRadius: 14,
-                backgroundColor: action.color + '18',
-                alignItems: 'center', justifyContent: 'center',
-              }}>
-                <MaterialCommunityIcons name={action.icon} size={22} color={action.color} />
-              </View>
+              <LinearGradient
+                colors={[tool.color + '30', tool.color + '12']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  width: 46, height: 46, borderRadius: 14,
+                  alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <MaterialCommunityIcons name={tool.icon} size={22} color={tool.color} />
+              </LinearGradient>
               <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary }}>
-                {action.label}
+                {tool.label}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      {/* ── 5. MÉTRICAS ────────────────────────────────────────── */}
+      {/* ── PROGRESSO — card único com divisores, em vez de 3 caixas soltas ── */}
       <View style={{ paddingHorizontal: 20 }}>
-        <Text style={{ fontSize: 16, fontWeight: '700', color: tokens.textPrimary, marginBottom: 12 }}>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: tokens.textPrimary, marginBottom: 14 }}>
           Seu progresso
         </Text>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{
+          flexDirection: 'row',
+          backgroundColor: tokens.bgCard,
+          borderRadius: 18,
+          borderWidth: 1,
+          borderColor: tokens.borderLight,
+          overflow: 'hidden',
+        }}>
           {[
-            { value: String(currentStreak), label: 'dias seguidos', icon: '🔥', color: tokens.warningText },
-            { value: String(chaptersRead),  label: 'capítulos lidos', icon: '📖', color: tokens.actionPrimary },
-            { value: `${Math.round(percentComplete)}%`, label: 'do plano', icon: '🎯', color: tokens.success },
-          ].map(m => (
-            <View key={m.label} style={{ flex: 1, backgroundColor: tokens.bgCard, borderRadius: 16, padding: 14, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: tokens.borderLight }}>
-              <Text style={{ fontSize: 22 }}>{m.icon}</Text>
-              <Text style={{ fontSize: 20, fontWeight: '800', color: m.color }}>{m.value}</Text>
-              <Text style={{ fontSize: 11, color: tokens.textTertiary, textAlign: 'center', lineHeight: 16 }}>{m.label}</Text>
+            { icon: 'fire'          as const, value: String(currentStreak), label: 'dias seguidos',  color: '#F59E0B' },
+            { icon: 'book-open-page-variant' as const, value: String(chaptersRead), label: 'capítulos lidos', color: tokens.actionPrimary },
+            { icon: 'target'        as const, value: `${Math.round(percentComplete)}%`, label: 'do plano', color: '#10B981' },
+          ].map((m, i) => (
+            <View key={m.label} style={{
+              flex: 1, alignItems: 'center', gap: 6, paddingVertical: 20,
+              borderRightWidth: i < 2 ? 1 : 0, borderRightColor: tokens.borderLight,
+            }}>
+              <MaterialCommunityIcons name={m.icon} size={20} color={m.color} />
+              <Text style={{ fontSize: 19, fontWeight: '800', color: tokens.textPrimary }}>{m.value}</Text>
+              <Text style={{ fontSize: 10.5, color: tokens.textTertiary, textAlign: 'center', lineHeight: 14 }}>{m.label}</Text>
             </View>
           ))}
         </View>

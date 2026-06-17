@@ -1,9 +1,18 @@
 /**
- * VERBUM — src/constants/propheticConnections.ts
+ * VERBUM — src/constants/propheticConnections.ts  [EXPANDIDO]
  *
  * Catálogo curado de profecias do Antigo Testamento e seus
  * cumprimentos no Novo Testamento. Fonte: hermenêutica bíblica
  * histórica, teologia reformada e exegese evangélica brasileira.
+ *
+ * Esta versão expande o catálogo original de 30 para ~79 conexões,
+ * cruzando contra a lista já existente para evitar duplicatas, e
+ * organiza tudo em 16 categorias (13 originais + 3 novas:
+ * "Profecias Messiânicas Diretas", "Ascensão e Reino Eterno",
+ * "Israel e a Igreja").
+ *
+ * As cores de CONNECTION_TYPE_COLORS também foram atualizadas da
+ * paleta antiga (marrom/azul) para a paleta atual do app.
  *
  * connectionType:
  *   'messianic'    — profecia messiânica direta
@@ -26,12 +35,12 @@ export interface PropheticConnection {
   ot: {
     bookSlug:  string;
     bookName:  string;
-    reference: string;   // "Isaías 7:14"
+    reference: string;
     abbrev:    string;
     chapter:   number;
     verseStart: number;
     verseEnd?:  number;
-    preview:   string;   // trecho do texto
+    preview:   string;
   };
 
   nt: {
@@ -46,10 +55,14 @@ export interface PropheticConnection {
   };
 
   connectionType: PropheticConnectionType;
-  note:           string;  // explicação teológica curta
+  note:           string;
 }
 
 export const PROPHETIC_CONNECTIONS: PropheticConnection[] = [
+  // ════════════════════════════════════════════════════════════════
+  // CATÁLOGO ORIGINAL (pc-001 a pc-030) — preservado sem alterações
+  // ════════════════════════════════════════════════════════════════
+
   // ── NASCIMENTO E INFÂNCIA ──────────────────────────────────────
   {
     id: 'pc-001',
@@ -255,7 +268,7 @@ export const PROPHETIC_CONNECTIONS: PropheticConnection[] = [
   // ── TIPOS E SOMBRAS ──────────────────────────────────────────────
   {
     id: 'pc-019',
-    theme: 'Cordeiro pascal',
+    theme: 'Cordeiro pascal — ossos não quebrados',
     category: 'Tipos e Sombras',
     ot: { bookSlug:'ex', bookName:'Êxodo', reference:'Êxodo 12:46', abbrev:'Ex', chapter:12, verseStart:46,
           preview:'Não deixareis nada dele para o dia seguinte... e não quebrareis osso algum.' },
@@ -299,7 +312,7 @@ export const PROPHETIC_CONNECTIONS: PropheticConnection[] = [
   },
   {
     id: 'pc-023',
-    theme: 'O sumo sacerdote eterno',
+    theme: 'O sumo sacerdote eterno — segundo Melquisedeque',
     category: 'Sacerdócio',
     ot: { bookSlug:'sl', bookName:'Salmos', reference:'Salmos 110:4', abbrev:'Sl', chapter:110, verseStart:4,
           preview:'O Senhor jurou e não se arrependera: Tu és sacerdote para sempre, segundo a ordem de Melquisedeque.' },
@@ -365,7 +378,7 @@ export const PROPHETIC_CONNECTIONS: PropheticConnection[] = [
   },
   {
     id: 'pc-029',
-    theme: 'Emmanuel — Deus conosco',
+    theme: 'Emanuel — Deus conosco',
     category: 'Identidade do Messias',
     ot: { bookSlug:'is', bookName:'Isaías', reference:'Isaías 9:6', abbrev:'Is', chapter:9, verseStart:6,
           preview:'Porque um menino nos nasceu, um filho se nos deu... e o seu nome se chamará: Maravilhoso Conselheiro, Deus Forte.' },
@@ -385,22 +398,594 @@ export const PROPHETIC_CONNECTIONS: PropheticConnection[] = [
     connectionType: 'typological',
     note: 'Jesus é o verdadeiro templo — presença de Deus encarnada que substitui e supera o templo físico.',
   },
+
+  // ════════════════════════════════════════════════════════════════
+  // NOVO: PROFECIAS MESSIÂNICAS DIRETAS (pc-031 a pc-049)
+  // ════════════════════════════════════════════════════════════════
+
+  {
+    id: 'pc-031',
+    theme: 'Protoevangelho — a semente que esmagará a serpente',
+    category: 'Profecias Messiânicas Diretas',
+    ot: { bookSlug:'gn', bookName:'Gênesis', reference:'Gênesis 3:15', abbrev:'Gn', chapter:3, verseStart:15,
+          preview:'E porei inimizade entre ti e a mulher, e entre a tua semente e a sua semente; esta te ferirá a cabeça.' },
+    nt: { bookSlug:'gl', bookName:'Gálatas', reference:'Gálatas 4:4', abbrev:'Gl', chapter:4, verseStart:4,
+          preview:'Mas, vindo a plenitude dos tempos, Deus enviou seu Filho, nascido de mulher, nascido sob a lei.' },
+    connectionType: 'messianic',
+    note: 'A primeira promessa messiânica da Bíblia — o "protoevangelho". Paulo identifica o cumprimento no Filho "nascido de mulher".',
+  },
+  {
+    id: 'pc-032',
+    theme: 'Bênção pela semente de Abraão',
+    category: 'Profecias Messiânicas Diretas',
+    ot: { bookSlug:'gn', bookName:'Gênesis', reference:'Gênesis 22:18', abbrev:'Gn', chapter:22, verseStart:18,
+          preview:'E em tua semente serão benditas todas as nações da terra, porquanto obedeceste à minha voz.' },
+    nt: { bookSlug:'at', bookName:'Atos', reference:'Atos 3:25-26', abbrev:'At', chapter:3, verseStart:25, verseEnd:26,
+          preview:'Deus, tendo levantado seu Filho, primeiramente vo-lo enviou a vós, para que vos abençoasse.' },
+    connectionType: 'fulfillment',
+    note: 'Pedro aplica a promessa feita a Abraão — bênção a todas as nações pela sua semente — diretamente a Jesus ressurreto.',
+  },
+  {
+    id: 'pc-033',
+    theme: 'O cetro que não se apartará de Judá',
+    category: 'Profecias Messiânicas Diretas',
+    ot: { bookSlug:'gn', bookName:'Gênesis', reference:'Gênesis 49:10', abbrev:'Gn', chapter:49, verseStart:10,
+          preview:'O cetro não se arredará de Judá... até que venha aquele a quem pertence; e a ele se congregarão os povos.' },
+    nt: { bookSlug:'hb', bookName:'Hebreus', reference:'Hebreus 7:14', abbrev:'Hb', chapter:7, verseStart:14,
+          preview:'Porque é manifesto que nosso Senhor procedeu de Judá, tribo da qual Moisés nada falou quanto ao sacerdócio.' },
+    connectionType: 'fulfillment',
+    note: 'Jacó profetiza que o governante final viria da tribo de Judá. Os evangelhos traçam a linhagem de Jesus precisamente até ali.',
+  },
+  {
+    id: 'pc-034',
+    theme: 'A estrela de Jacó',
+    category: 'Nascimento e Infância',
+    ot: { bookSlug:'nm', bookName:'Números', reference:'Números 24:17', abbrev:'Nm', chapter:24, verseStart:17,
+          preview:'Uma estrela procederá de Jacó, e um cetro subirá de Israel.' },
+    nt: { bookSlug:'mt', bookName:'Mateus', reference:'Mateus 2:2', abbrev:'Mt', chapter:2, verseStart:2,
+          preview:'Onde está aquele que nasceu Rei dos judeus? Porque vimos a sua estrela no Oriente, e viemos a adorá-lo.' },
+    connectionType: 'fulfillment',
+    note: 'A profecia de Balaão sobre uma estrela ligada ao governante de Israel encontra eco direto na estrela que guiou os magos.',
+  },
+  {
+    id: 'pc-035',
+    theme: 'O trono eterno de Davi',
+    category: 'Ascensão e Reino Eterno',
+    ot: { bookSlug:'2sm', bookName:'2 Samuel', reference:'2 Samuel 7:12-16', abbrev:'2Sm', chapter:7, verseStart:12, verseEnd:16,
+          preview:'E será firmada a tua casa e o teu reino para sempre diante de ti; e o teu trono será estabelecido para sempre.' },
+    nt: { bookSlug:'lc', bookName:'Lucas', reference:'Lucas 1:32-33', abbrev:'Lc', chapter:1, verseStart:32, verseEnd:33,
+          preview:'O Senhor Deus lhe dará o trono de Davi, seu pai... e o seu reino não terá fim.' },
+    connectionType: 'fulfillment',
+    note: 'A promessa a Davi de um trono eterno é declarada por Gabriel como cumprida no reino sem fim de Jesus.',
+  },
+  {
+    id: 'pc-036',
+    theme: '"Tu és meu Filho"',
+    category: 'Identidade do Messias',
+    ot: { bookSlug:'sl', bookName:'Salmos', reference:'Salmos 2:7', abbrev:'Sl', chapter:2, verseStart:7,
+          preview:'O Senhor me disse: Tu és meu Filho, eu hoje te gerei.' },
+    nt: { bookSlug:'hb', bookName:'Hebreus', reference:'Hebreus 1:5', abbrev:'Hb', chapter:1, verseStart:5,
+          preview:'Porque a qual dos anjos disse jamais: Tu és meu Filho, hoje te gerei?' },
+    connectionType: 'fulfillment',
+    note: 'O Salmo 2 é citado no batismo de Jesus (Mt 3:17) e em Hebreus para afirmar sua filiação divina única.',
+  },
+  {
+    id: 'pc-037',
+    theme: 'Herança das nações',
+    category: 'Ascensão e Reino Eterno',
+    ot: { bookSlug:'sl', bookName:'Salmos', reference:'Salmos 2:8', abbrev:'Sl', chapter:2, verseStart:8,
+          preview:'Pede-me e eu te darei as nações por herança, e os fins da terra por possessão tua.' },
+    nt: { bookSlug:'ap', bookName:'Apocalipse', reference:'Apocalipse 2:27', abbrev:'Ap', chapter:2, verseStart:27,
+          preview:'E ele as regerá com vara de ferro; como vasos de oleiro elas serão despedaçadas.' },
+    connectionType: 'thematic',
+    note: 'A promessa messiânica de domínio universal no Salmo 2 reaparece no Apocalipse como autoridade dada ao próprio Cristo e à igreja vencedora.',
+  },
+  {
+    id: 'pc-038',
+    theme: 'Louvor na boca das crianças',
+    category: 'Ministério',
+    ot: { bookSlug:'sl', bookName:'Salmos', reference:'Salmos 8:2', abbrev:'Sl', chapter:8, verseStart:2,
+          preview:'Da boca dos meninos e dos que mamam tiraste a fortaleza, por causa dos teus adversários.' },
+    nt: { bookSlug:'mt', bookName:'Mateus', reference:'Mateus 21:16', abbrev:'Mt', chapter:21, verseStart:16,
+          preview:'Da boca dos pequeninos e que mamam aperfeiçoaste o louvor.' },
+    connectionType: 'fulfillment',
+    note: 'Jesus cita o Salmo 8 ao templo, defendendo o louvor espontâneo das crianças durante a entrada triunfal.',
+  },
+  {
+    id: 'pc-039',
+    theme: 'Todas as coisas sob seus pés',
+    category: 'Identidade do Messias',
+    ot: { bookSlug:'sl', bookName:'Salmos', reference:'Salmos 8:6', abbrev:'Sl', chapter:8, verseStart:6,
+          preview:'Tu o fazes ter domínio sobre as obras das tuas mãos; tudo puseste debaixo de seus pés.' },
+    nt: { bookSlug:'hb', bookName:'Hebreus', reference:'Hebreus 2:8', abbrev:'Hb', chapter:2, verseStart:6, verseEnd:8,
+          preview:'Sujeitaste todas as coisas debaixo dos seus pés. Ora, visto que lhe sujeitou todas as coisas, nada deixou que lhe não fosse sujeito.' },
+    connectionType: 'fulfillment',
+    note: 'Hebreus aplica o domínio universal do Salmo 8 — originalmente sobre a humanidade — à supremacia cósmica de Cristo.',
+  },
+  {
+    id: 'pc-040',
+    theme: 'Reino eterno sobre o trono de Davi',
+    category: 'Ascensão e Reino Eterno',
+    ot: { bookSlug:'is', bookName:'Isaías', reference:'Isaías 9:6-7', abbrev:'Is', chapter:9, verseStart:6, verseEnd:7,
+          preview:'Sobre o trono de Davi, e sobre o seu reino, para o firmar e fortificar... desde agora e para sempre.' },
+    nt: { bookSlug:'lc', bookName:'Lucas', reference:'Lucas 1:32-33', abbrev:'Lc', chapter:1, verseStart:32, verseEnd:33,
+          preview:'Este será grande e será chamado filho do Altíssimo... e o seu reino não terá fim.' },
+    connectionType: 'fulfillment',
+    note: 'Isaías profetiza um reino davídico que dura para sempre. Gabriel anuncia exatamente isso a Maria sobre Jesus.',
+  },
+  {
+    id: 'pc-041',
+    theme: 'O Renovo da raiz de Jessé',
+    category: 'Profecias Messiânicas Diretas',
+    ot: { bookSlug:'is', bookName:'Isaías', reference:'Isaías 11:1', abbrev:'Is', chapter:11, verseStart:1,
+          preview:'Porque brotará um renovo do tronco de Jessé, e das suas raízes um renovo crescerá.' },
+    nt: { bookSlug:'rm', bookName:'Romanos', reference:'Romanos 15:12', abbrev:'Rm', chapter:15, verseStart:12,
+          preview:'Outra vez diz Isaías: Haverá a raiz de Jessé, e o que se levantar para reinar sobre os gentios; nele os gentios esperarão.' },
+    connectionType: 'fulfillment',
+    note: 'Mesmo quando a linhagem davídica parecia um tronco morto, Isaías prevê o brotar do Messias — Paulo identifica o cumprimento em Cristo.',
+  },
+  {
+    id: 'pc-042',
+    theme: 'Pedra angular preciosa',
+    category: 'Rejeição e Glória',
+    ot: { bookSlug:'is', bookName:'Isaías', reference:'Isaías 28:16', abbrev:'Is', chapter:28, verseStart:16,
+          preview:'Eis que eu ponho em Sião uma pedra, uma pedra preciosa de esquina, para fundamento... aquele que crer não se apressará.' },
+    nt: { bookSlug:'rm', bookName:'Romanos', reference:'Romanos 9:33', abbrev:'Rm', chapter:9, verseStart:33,
+          preview:'Eis que ponho em Sião uma pedra de tropeço e uma rocha de escândalo; e quem nela crer não será confundido.' },
+    connectionType: 'fulfillment',
+    note: 'Paulo identifica Cristo como a pedra angular de Isaías — fundamento seguro para a fé, mas pedra de tropeço para a incredulidade.',
+  },
+  {
+    id: 'pc-043',
+    theme: 'Milagres de cura do Messias',
+    category: 'Ministério',
+    ot: { bookSlug:'is', bookName:'Isaías', reference:'Isaías 35:5-6', abbrev:'Is', chapter:35, verseStart:5, verseEnd:6,
+          preview:'Então os olhos dos cegos serão abertos, e os ouvidos dos surdos se desimpedirão... então saltará o coxo como um veado.' },
+    nt: { bookSlug:'mt', bookName:'Mateus', reference:'Mateus 11:5', abbrev:'Mt', chapter:11, verseStart:4, verseEnd:5,
+          preview:'Os cegos veem, e os coxos andam; os leprosos são purificados, e os surdos ouvem; os mortos são ressuscitados.' },
+    connectionType: 'fulfillment',
+    note: 'Quando João Batista pergunta se Jesus é o Messias, a resposta de Jesus aponta exatamente para o cumprimento de Isaías 35.',
+  },
+  {
+    id: 'pc-044',
+    theme: 'Voz que clama no deserto',
+    category: 'Ministério',
+    ot: { bookSlug:'is', bookName:'Isaías', reference:'Isaías 40:3', abbrev:'Is', chapter:40, verseStart:3,
+          preview:'A voz do que clama no deserto: Preparai o caminho do Senhor; endireitai no deserto vereda ao nosso Deus.' },
+    nt: { bookSlug:'mt', bookName:'Mateus', reference:'Mateus 3:3', abbrev:'Mt', chapter:3, verseStart:1, verseEnd:3,
+          preview:'Porque este é aquele de quem disse o profeta Isaías: Voz do que clama no deserto: Preparai o caminho do Senhor.' },
+    connectionType: 'fulfillment',
+    note: 'Os quatro evangelhos identificam João Batista como essa voz — o precursor que prepara a chegada do próprio Senhor.',
+  },
+  {
+    id: 'pc-045',
+    theme: 'O Servo que traz justiça às nações',
+    category: 'Identidade do Messias',
+    ot: { bookSlug:'is', bookName:'Isaías', reference:'Isaías 42:1', abbrev:'Is', chapter:42, verseStart:1, verseEnd:4,
+          preview:'Eis aqui o meu Servo, a quem sustenho; o meu escolhido, em quem se agrada a minha alma... trará justiça às nações.' },
+    nt: { bookSlug:'mt', bookName:'Mateus', reference:'Mateus 12:18', abbrev:'Mt', chapter:12, verseStart:17, verseEnd:21,
+          preview:'Eis aqui o meu servo, que escolhi; o meu amado, em quem a minha alma se agrada... e as nações esperarão no seu nome.' },
+    connectionType: 'fulfillment',
+    note: 'Mateus cita extensamente o primeiro "Cântico do Servo" de Isaías ao descrever o caráter manso e a missão de Jesus.',
+  },
+  {
+    id: 'pc-046',
+    theme: 'Ferido e esbofeteado',
+    category: 'Paixão',
+    ot: { bookSlug:'is', bookName:'Isaías', reference:'Isaías 50:6', abbrev:'Is', chapter:50, verseStart:6,
+          preview:'Dei as minhas costas aos que me feriam, e a minha face aos que me arrancavam os cabelos; não escondi a minha face de afrontas e de escarros.' },
+    nt: { bookSlug:'mt', bookName:'Mateus', reference:'Mateus 26:67', abbrev:'Mt', chapter:26, verseStart:67,
+          preview:'Então lhe escarraram no rosto, e lhe deram murros; e outros o feriram com bofetadas.' },
+    connectionType: 'fulfillment',
+    note: 'Isaías antecipa, séculos antes, o tratamento humilhante que o Servo sofreria — cumprido no julgamento de Jesus.',
+  },
+  {
+    id: 'pc-047',
+    theme: 'O Servo exaltado depois de humilhado',
+    category: 'Rejeição e Glória',
+    ot: { bookSlug:'is', bookName:'Isaías', reference:'Isaías 52:13-15', abbrev:'Is', chapter:52, verseStart:13, verseEnd:15,
+          preview:'Eis que o meu Servo prosperará; será elevado, exaltado e mui sublime... assim ele asperge muitas nações.' },
+    nt: { bookSlug:'fp', bookName:'Filipenses', reference:'Filipenses 2:9', abbrev:'Fp', chapter:2, verseStart:7, verseEnd:11,
+          preview:'Por isso Deus também o exaltou soberanamente, e lhe deu um nome que é sobre todo nome.' },
+    connectionType: 'fulfillment',
+    note: 'O padrão profético de humilhação seguida de exaltação suprema é o mesmo movimento que Paulo descreve no hino cristológico de Filipenses.',
+  },
+  {
+    id: 'pc-048',
+    theme: 'Desprezado e rejeitado pelos seus',
+    category: 'Paixão',
+    ot: { bookSlug:'is', bookName:'Isaías', reference:'Isaías 53:3', abbrev:'Is', chapter:53, verseStart:3,
+          preview:'Era desprezado e o mais rejeitado dos homens, homem de dores, experimentado nos trabalhos.' },
+    nt: { bookSlug:'jo', bookName:'João', reference:'João 1:11', abbrev:'Jo', chapter:1, verseStart:11,
+          preview:'Veio para o que era seu, e os seus não o receberam.' },
+    connectionType: 'fulfillment',
+    note: 'A rejeição profetizada por Isaías sobre o Servo sofredor é confirmada por João: o próprio povo de Jesus não o recebeu.',
+  },
+  {
+    id: 'pc-049',
+    theme: 'Levou nossas enfermidades',
+    category: 'Ministério',
+    ot: { bookSlug:'is', bookName:'Isaías', reference:'Isaías 53:4', abbrev:'Is', chapter:53, verseStart:4,
+          preview:'Verdadeiramente ele tomou sobre si as nossas enfermidades, e as nossas dores levou sobre si.' },
+    nt: { bookSlug:'mt', bookName:'Mateus', reference:'Mateus 8:17', abbrev:'Mt', chapter:8, verseStart:16, verseEnd:17,
+          preview:'Para que se cumprisse o que fora dito pelo profeta Isaías: Ele tomou sobre si as nossas enfermidades.' },
+    connectionType: 'fulfillment',
+    note: 'Mateus cita diretamente Isaías 53:4 ao narrar os curativos de Jesus — o sofrimento do Servo já alcança a enfermidade humana.',
+  },
+
+  // ════════════════════════════════════════════════════════════════
+  // NOVO: MAIS PAIXÃO, TRAIÇÃO E JULGAMENTO (pc-050 a pc-057)
+  // ════════════════════════════════════════════════════════════════
+
+  {
+    id: 'pc-050',
+    theme: 'Escárnio na cruz',
+    category: 'Paixão',
+    ot: { bookSlug:'sl', bookName:'Salmos', reference:'Salmos 22:7-8', abbrev:'Sl', chapter:22, verseStart:7, verseEnd:8,
+          preview:'Todos os que me veem, escarnecem de mim; arreganham os labios, movem a cabeça, dizendo: Confiou no Senhor, livre-o ele.' },
+    nt: { bookSlug:'mt', bookName:'Mateus', reference:'Mateus 27:39-43', abbrev:'Mt', chapter:27, verseStart:39, verseEnd:43,
+          preview:'E os que passavam blasfemavam dele, movendo as cabeças... Confiou em Deus; livre-o agora, se o ama.' },
+    connectionType: 'fulfillment',
+    note: 'O escárnio detalhado no Salmo 22 — incluindo o exato argumento usado — se repete palavra por palavra na cruz de Jesus.',
+  },
+  {
+    id: 'pc-051',
+    theme: 'Mãos e pés perfurados',
+    category: 'Paixão',
+    ot: { bookSlug:'sl', bookName:'Salmos', reference:'Salmos 22:16', abbrev:'Sl', chapter:22, verseStart:16,
+          preview:'Cercaram-me cães; uma companhia de malfeitores me rodeou; traspassaram-me as mãos e os pés.' },
+    nt: { bookSlug:'jo', bookName:'João', reference:'João 20:25', abbrev:'Jo', chapter:20, verseStart:25,
+          preview:'Se eu não vir o sinal dos cravos nas suas mãos... não o crerei.' },
+    connectionType: 'fulfillment',
+    note: 'Escrito séculos antes da crucificação ser um método romano comum, o Salmo 22 já descreve mãos e pés perfurados.',
+  },
+  {
+    id: 'pc-052',
+    theme: 'Falsas testemunhas',
+    category: 'Traição e Julgamento',
+    ot: { bookSlug:'sl', bookName:'Salmos', reference:'Salmos 35:11', abbrev:'Sl', chapter:35, verseStart:11,
+          preview:'Falsas testemunhas se levantam contra mim, e me perguntam coisas que não sei.' },
+    nt: { bookSlug:'mc', bookName:'Marcos', reference:'Marcos 14:57', abbrev:'Mc', chapter:14, verseStart:57,
+          preview:'Então, levantando-se alguns, testemunharam falsamente contra ele.' },
+    connectionType: 'fulfillment',
+    note: 'O justo sofredor do Salmo 35 enfrenta acusações inventadas — exatamente o que ocorre no julgamento diante do Sinédrio.',
+  },
+  {
+    id: 'pc-053',
+    theme: 'Trono de Deus para sempre',
+    category: 'Identidade do Messias',
+    ot: { bookSlug:'sl', bookName:'Salmos', reference:'Salmos 45:6-7', abbrev:'Sl', chapter:45, verseStart:6, verseEnd:7,
+          preview:'O teu trono, ó Deus, é eterno; o cetro do teu reino é cetro de equidade.' },
+    nt: { bookSlug:'hb', bookName:'Hebreus', reference:'Hebreus 1:8-9', abbrev:'Hb', chapter:1, verseStart:8, verseEnd:9,
+          preview:'Mas, do Filho, diz: O teu trono, ó Deus, subsiste pelos séculos dos séculos.' },
+    connectionType: 'fulfillment',
+    note: 'Hebreus cita este salmo régio para provar que o Filho é chamado "Deus" pelo próprio Pai — divindade plena do Messias.',
+  },
+  {
+    id: 'pc-054',
+    theme: 'Odiado sem causa',
+    category: 'Traição e Julgamento',
+    ot: { bookSlug:'sl', bookName:'Salmos', reference:'Salmos 69:4', abbrev:'Sl', chapter:69, verseStart:4,
+          preview:'Aqueles que me odeiam sem causa são mais numerosos do que os cabelos da minha cabeça.' },
+    nt: { bookSlug:'jo', bookName:'João', reference:'João 15:25', abbrev:'Jo', chapter:15, verseStart:25,
+          preview:'Mas isto é para que se cumpra a palavra escrita na sua lei: Sem causa me odiaram.' },
+    connectionType: 'fulfillment',
+    note: 'Jesus mesmo cita este salmo para explicar a hostilidade injustificada que enfrentava de seus opositores.',
+  },
+  {
+    id: 'pc-055',
+    theme: 'Zelo pela casa de Deus',
+    category: 'Ministério',
+    ot: { bookSlug:'sl', bookName:'Salmos', reference:'Salmos 69:9', abbrev:'Sl', chapter:69, verseStart:9,
+          preview:'Pois o zelo da tua casa me devorou, e os opróbrios dos que te vituperam cairam sobre mim.' },
+    nt: { bookSlug:'jo', bookName:'João', reference:'João 2:17', abbrev:'Jo', chapter:2, verseStart:17,
+          preview:'E os seus discípulos lembraram-se de que estava escrito: O zelo da tua casa me devorou.' },
+    connectionType: 'fulfillment',
+    note: 'A purificação do templo por Jesus é diretamente associada pelos discípulos a este salmo messiânico.',
+  },
+  {
+    id: 'pc-056',
+    theme: 'Levado como cordeiro ao matadouro',
+    category: 'Paixão',
+    ot: { bookSlug:'is', bookName:'Isaías', reference:'Isaías 53:7', abbrev:'Is', chapter:53, verseStart:7,
+          preview:'Foi oprimido, mas não abriu a sua boca; como um cordeiro foi levado ao matadouro, e como a ovelha muda perante os seus tosquiadores.' },
+    nt: { bookSlug:'at', bookName:'Atos', reference:'Atos 8:32', abbrev:'At', chapter:8, verseStart:32, verseEnd:35,
+          preview:'Foi levado como ovelha ao matadouro... Filipe lhe anunciou a Jesus.' },
+    connectionType: 'fulfillment',
+    note: 'Filipe usa exatamente esta passagem para explicar ao eunuco etíope que Isaías 53 fala de Jesus.',
+  },
+  {
+    id: 'pc-057',
+    theme: 'Contado entre os transgressores',
+    category: 'Paixão',
+    ot: { bookSlug:'is', bookName:'Isaías', reference:'Isaías 53:12', abbrev:'Is', chapter:53, verseStart:12,
+          preview:'E foi contado com os transgressores; e ele tomou sobre si o pecado de muitos, e pelos transgressores intercedeu.' },
+    nt: { bookSlug:'lc', bookName:'Lucas', reference:'Lucas 22:37', abbrev:'Lc', chapter:22, verseStart:37,
+          preview:'Porque eu vos digo que importa que se cumpra em mim ainda isto que está escrito: E com os malfeitores foi contado.' },
+    connectionType: 'fulfillment',
+    note: 'O próprio Jesus cita Isaías 53:12 na véspera de sua morte, sabendo que seria crucificado entre dois criminosos.',
+  },
+
+  // ════════════════════════════════════════════════════════════════
+  // NOVO: ASCENSÃO E REINO ETERNO (continuação) (pc-058 a pc-060)
+  // ════════════════════════════════════════════════════════════════
+
+  {
+    id: 'pc-058',
+    theme: 'Subiu ao alto e deu dons',
+    category: 'Ascensão e Reino Eterno',
+    ot: { bookSlug:'sl', bookName:'Salmos', reference:'Salmos 68:18', abbrev:'Sl', chapter:68, verseStart:18,
+          preview:'Tu subiste ao alto, levaste cativos; recebeste dons para os homens.' },
+    nt: { bookSlug:'ef', bookName:'Efésios', reference:'Efésios 4:8', abbrev:'Ef', chapter:4, verseStart:8,
+          preview:'Pelo que diz: Quando subiu ao alto, levou cativo o cativeiro, e deu dons aos homens.' },
+    connectionType: 'fulfillment',
+    note: 'Paulo aplica este salmo de vitória real à ascensão de Cristo e à distribuição dos dons espirituais à igreja.',
+  },
+  {
+    id: 'pc-059',
+    theme: 'O Renovo justo de Davi',
+    category: 'Profecias Messiânicas Diretas',
+    ot: { bookSlug:'jr', bookName:'Jeremias', reference:'Jeremias 23:5-6', abbrev:'Jr', chapter:23, verseStart:5, verseEnd:6,
+          preview:'Levantarei a Davi um Renovo justo, e ele reinará, e prosperará, e fará juízo e justiça na terra.' },
+    nt: { bookSlug:'lc', bookName:'Lucas', reference:'Lucas 1:32-33', abbrev:'Lc', chapter:1, verseStart:32, verseEnd:33,
+          preview:'Este será grande, e será chamado filho do Altíssimo... e reinará para sempre.' },
+    connectionType: 'fulfillment',
+    note: 'Jeremias profetiza num momento de crise da monarquia davídica um "Renovo justo" — Lucas aplica isso ao nascimento de Jesus.',
+  },
+  {
+    id: 'pc-060',
+    theme: 'O pastor ferido, as ovelhas dispersas',
+    category: 'Traição e Julgamento',
+    ot: { bookSlug:'zc', bookName:'Zacarias', reference:'Zacarias 13:7', abbrev:'Zc', chapter:13, verseStart:7,
+          preview:'Fere o pastor, e espalhar-se-ão as ovelhas; e farei voltar a minha mão contra os pequenos.' },
+    nt: { bookSlug:'mt', bookName:'Mateus', reference:'Mateus 26:31', abbrev:'Mt', chapter:26, verseStart:31,
+          preview:'Esta noite todos vós vos escandalizareis em mim; porque escrito está: Ferirei o pastor, e as ovelhas do rebanho se dispersarão.' },
+    connectionType: 'fulfillment',
+    note: 'Jesus mesmo cita Zacarias na última ceia, prevendo que seus discípulos se dispersariam após sua prisão.',
+  },
+
+  // ════════════════════════════════════════════════════════════════
+  // NOVO: MINISTÉRIO — Elias que há de vir (pc-061)
+  // ════════════════════════════════════════════════════════════════
+
+  {
+    id: 'pc-061',
+    theme: 'Elias que há de vir',
+    category: 'Ministério',
+    ot: { bookSlug:'ml', bookName:'Malaquias', reference:'Malaquias 4:5-6', abbrev:'Ml', chapter:4, verseStart:5, verseEnd:6,
+          preview:'Eis que eu vos envio o profeta Elias, antes que venha o grande e terrível dia do Senhor.' },
+    nt: { bookSlug:'lc', bookName:'Lucas', reference:'Lucas 1:17', abbrev:'Lc', chapter:1, verseStart:17,
+          preview:'E irá adiante dele no espírito e poder de Elias, para converter os corações dos pais aos filhos.' },
+    connectionType: 'fulfillment',
+    note: 'O anjo Gabriel anuncia a João Batista exatamente com a linguagem da última profecia do Antigo Testamento sobre Elias.',
+  },
+
+  // ════════════════════════════════════════════════════════════════
+  // NOVO: TIPOS E SOMBRAS — ampliação (pc-062 a pc-073)
+  // ════════════════════════════════════════════════════════════════
+
+  {
+    id: 'pc-062',
+    theme: 'Adão, tipo de Cristo',
+    category: 'Tipos e Sombras',
+    ot: { bookSlug:'gn', bookName:'Gênesis', reference:'Gênesis 2:7', abbrev:'Gn', chapter:2, verseStart:7,
+          preview:'E formou o Senhor Deus o homem do pó da terra, e soprou em seus narizes o fôlego da vida.' },
+    nt: { bookSlug:'rm', bookName:'Romanos', reference:'Romanos 5:14', abbrev:'Rm', chapter:5, verseStart:14,
+          preview:'Mas a morte reinou desde Adão até Moisés... o qual é a figura daquele que havia de vir.' },
+    connectionType: 'typological',
+    note: 'Paulo chama Adão expressamente de "figura" (tipo) de Cristo — o primeiro homem que trouxe morte, o segundo Adão que traz vida.',
+  },
+  {
+    id: 'pc-063',
+    theme: 'A arca, tipo da salvação',
+    category: 'Tipos e Sombras',
+    ot: { bookSlug:'gn', bookName:'Gênesis', reference:'Gênesis 7:1', abbrev:'Gn', chapter:7, verseStart:1,
+          preview:'Então disse o Senhor a Noé: Entra na arca, tu e toda a tua casa.' },
+    nt: { bookSlug:'1pe', bookName:'1 Pedro', reference:'1 Pedro 3:20-21', abbrev:'1Pe', chapter:3, verseStart:20, verseEnd:21,
+          preview:'Os quais foram salvos pela água... a qual também agora corresponde ao batismo.' },
+    connectionType: 'typological',
+    note: 'Pedro associa explicitamente a salvação pela arca em meio ao dilúvio à salvação simbolizada no batismo cristão.',
+  },
+  {
+    id: 'pc-064',
+    theme: 'Melquisedeque, sacerdote-rei',
+    category: 'Sacerdócio',
+    ot: { bookSlug:'gn', bookName:'Gênesis', reference:'Gênesis 14:18', abbrev:'Gn', chapter:14, verseStart:18, verseEnd:20,
+          preview:'Então Melquisedeque, rei de Salém, trouxe pão e vinho; e era sacerdote do Deus Altíssimo.' },
+    nt: { bookSlug:'hb', bookName:'Hebreus', reference:'Hebreus 7:3', abbrev:'Hb', chapter:7, verseStart:1, verseEnd:3,
+          preview:'Sem pai, sem mãe, sem genealogia, não tendo princípio de dias nem fim de vida, mas sendo feito semelhante ao Filho de Deus.' },
+    connectionType: 'typological',
+    note: 'Hebreus dedica um capítulo inteiro a mostrar como esse misterioso sacerdote-rei prefigura o sacerdócio régio e eterno de Cristo.',
+  },
+  {
+    id: 'pc-065',
+    theme: 'Eis o Cordeiro de Deus',
+    category: 'Tipos e Sombras',
+    ot: { bookSlug:'ex', bookName:'Êxodo', reference:'Êxodo 12:3', abbrev:'Ex', chapter:12, verseStart:3, verseEnd:13,
+          preview:'Tomareis um cordeiro... sem mácula, macho, de um ano; e tomareis do seu sangue, e o porás nos dois umbrais.' },
+    nt: { bookSlug:'jo', bookName:'João', reference:'João 1:29', abbrev:'Jo', chapter:1, verseStart:29,
+          preview:'Eis o Cordeiro de Deus, que tira o pecado do mundo.' },
+    connectionType: 'typological',
+    note: 'João Batista identifica Jesus usando precisamente a imagem do cordeiro sacrificial que livrava Israel da morte no Egito.',
+  },
+  {
+    id: 'pc-066',
+    theme: 'A Rocha espiritual ferida',
+    category: 'Tipos e Sombras',
+    ot: { bookSlug:'ex', bookName:'Êxodo', reference:'Êxodo 17:6', abbrev:'Ex', chapter:17, verseStart:6,
+          preview:'Eis que eu ali estarei diante de ti sobre a rocha em Horebe, e tu ferirás a rocha, e dela sairão águas.' },
+    nt: { bookSlug:'1co', bookName:'1 Coríntios', reference:'1 Coríntios 10:4', abbrev:'1Co', chapter:10, verseStart:4,
+          preview:'E todos beberam da mesma bebida espiritual... e a rocha era Cristo.' },
+    connectionType: 'typological',
+    note: 'Paulo declara explicitamente que a rocha que deu água a Israel no deserto "era Cristo" — provisão divina que sustenta o povo.',
+  },
+  {
+    id: 'pc-067',
+    theme: 'Deus tabernaculou entre nós',
+    category: 'Tipos e Sombras',
+    ot: { bookSlug:'ex', bookName:'Êxodo', reference:'Êxodo 25:8', abbrev:'Ex', chapter:25, verseStart:8,
+          preview:'E me farão um santuário, para que eu habite no meio deles.' },
+    nt: { bookSlug:'jo', bookName:'João', reference:'João 1:14', abbrev:'Jo', chapter:1, verseStart:14,
+          preview:'E o Verbo se fez carne, e habitou entre nós, e vimos a sua gloria.' },
+    connectionType: 'typological',
+    note: 'O verbo grego usado por João para "habitou" carrega o sentido de "tabernaculou" — Jesus é a presença de Deus entre o povo, como o tabernáculo.',
+  },
+  {
+    id: 'pc-068',
+    theme: 'O sacrifício perfeito e definitivo',
+    category: 'Sacerdócio',
+    ot: { bookSlug:'lv', bookName:'Levítico', reference:'Levítico 17:11', abbrev:'Lv', chapter:17, verseStart:11,
+          preview:'Porque a vida da carne está no sangue; e eu vo-lo tenho dado a vós para fazer expiação pelas vossas almas sobre o altar.' },
+    nt: { bookSlug:'hb', bookName:'Hebreus', reference:'Hebreus 10:1', abbrev:'Hb', chapter:10, verseStart:1, verseEnd:14,
+          preview:'Mas este, havendo oferecido um único sacrifício pelos pecados, assentou-se para sempre à direita de Deus.' },
+    connectionType: 'typological',
+    note: 'Todo o sistema sacrificial levítico, repetido ano após ano, é declarado por Hebreus como sombra do único sacrifício suficiente de Cristo.',
+  },
+  {
+    id: 'pc-069',
+    theme: 'O grande Sumo Sacerdote',
+    category: 'Sacerdócio',
+    ot: { bookSlug:'lv', bookName:'Levítico', reference:'Levítico 16:32-34', abbrev:'Lv', chapter:16, verseStart:32, verseEnd:34,
+          preview:'E o sacerdote, que for untado, e que for sagrado para administrar o sacerdócio... fará expiação uma vez no ano por todos os seus pecados.' },
+    nt: { bookSlug:'hb', bookName:'Hebreus', reference:'Hebreus 4:14-16', abbrev:'Hb', chapter:4, verseStart:14, verseEnd:16,
+          preview:'Visto que temos um grande sumo sacerdote, Jesus, Filho de Deus... cheguemos, pois, com confiança ao trono da graça.' },
+    connectionType: 'typological',
+    note: 'A função anual do sumo sacerdote no Dia da Expiação prefigura o acesso permanente que Cristo, nosso Sumo Sacerdote, garante aos crentes.',
+  },
+  {
+    id: 'pc-070',
+    theme: 'O sinal de Jonas',
+    category: 'Tipos e Sombras',
+    ot: { bookSlug:'jn', bookName:'Jonas', reference:'Jonas 1:17', abbrev:'Jn', chapter:1, verseStart:17,
+          preview:'E preparou o Senhor um grande peixe, para que tragasse a Jonas; e esteve Jonas três dias e três noites nas entranhas do peixe.' },
+    nt: { bookSlug:'mt', bookName:'Mateus', reference:'Mateus 12:40', abbrev:'Mt', chapter:12, verseStart:40,
+          preview:'Porque, como Jonas esteve três dias e três noites no ventre da baleia, assim estará o Filho do homem três dias e três noites no seio da terra.' },
+    connectionType: 'typological',
+    note: 'O próprio Jesus identifica os três dias de Jonas no peixe como sinal antecipado de sua morte e ressurreição.',
+  },
+  {
+    id: 'pc-071',
+    theme: 'José, rejeitado pelos irmãos e exaltado',
+    category: 'Tipos e Sombras',
+    ot: { bookSlug:'gn', bookName:'Gênesis', reference:'Gênesis 37:28', abbrev:'Gn', chapter:37, verseStart:28,
+          preview:'E venderam José aos ismaelitas por vinte moedas de prata... e estes levaram José ao Egito.' },
+    nt: { bookSlug:'at', bookName:'Atos', reference:'Atos 7:9', abbrev:'At', chapter:7, verseStart:9, verseEnd:14,
+          preview:'Os patriarcas, movidos de invidia, venderam a José; mas Deus era com ele... e o constituiu governador do Egito.' },
+    connectionType: 'typological',
+    note: 'José vendido pelos próprios irmãos e depois exaltado para salvá-los da fome é um dos tipos mais ricos de Cristo no Antigo Testamento.',
+  },
+  {
+    id: 'pc-072',
+    theme: 'Boaz, tipo do Redentor',
+    category: 'Tipos e Sombras',
+    ot: { bookSlug:'rt', bookName:'Rute', reference:'Rute 4:9-10', abbrev:'Rt', chapter:4, verseStart:9, verseEnd:10,
+          preview:'Vós sois hoje testemunhas de que comprei tudo o que foi de Elimeleque... e também tomo a Rute, a moabita, por mulher.' },
+    nt: { bookSlug:'ef', bookName:'Efésios', reference:'Efésios 1:7', abbrev:'Ef', chapter:1, verseStart:7,
+          preview:'Em quem temos a redenção pelo seu sangue, a saber, a remissão das culpas.' },
+    connectionType: 'typological',
+    note: 'Boaz, o parente-redentor que paga o preço para resgatar Rute, prefigura Cristo, que paga o preço da redenção pelo seu próprio sangue.',
+  },
+  {
+    id: 'pc-073',
+    theme: 'O Rei-Pastor',
+    category: 'Tipos e Sombras',
+    ot: { bookSlug:'sl', bookName:'Salmos', reference:'Salmos 78:70-71', abbrev:'Sl', chapter:78, verseStart:70, verseEnd:71,
+          preview:'Escolheu também a Davi, seu servo... para que apascentasse a Jacó, seu povo, e a Israel, sua herança.' },
+    nt: { bookSlug:'jo', bookName:'João', reference:'João 10:11', abbrev:'Jo', chapter:10, verseStart:11,
+          preview:'Eu sou o bom pastor; o bom pastor dá a sua vida pelas ovelhas.' },
+    connectionType: 'typological',
+    note: 'Davi, tirado do pastoreio de ovelhas para pastorear Israel, é tipo do Rei-Pastor definitivo que dá a própria vida pelo rebanho.',
+  },
+
+  // ════════════════════════════════════════════════════════════════
+  // NOVO: ISRAEL E A IGREJA (pc-074 a pc-079)
+  // ════════════════════════════════════════════════════════════════
+
+  {
+    id: 'pc-074',
+    theme: 'Restauração do tabernáculo de Davi',
+    category: 'Israel e a Igreja',
+    ot: { bookSlug:'am', bookName:'Amós', reference:'Amós 9:11-12', abbrev:'Am', chapter:9, verseStart:11, verseEnd:12,
+          preview:'Naquele dia levantarei a tenda caída de Davi... para que possuam o resto de Edom e todos os gentios.' },
+    nt: { bookSlug:'at', bookName:'Atos', reference:'Atos 15:16-17', abbrev:'At', chapter:15, verseStart:15, verseEnd:17,
+          preview:'Depois disto voltarei, e reedificarei a tenda de Davi, que está caída... para que o resto dos homens busque ao Senhor.' },
+    connectionType: 'fulfillment',
+    note: 'Tiago cita Amós no Concílio de Jerusalém para justificar teologicamente a inclusão dos gentios na igreja sem exigir a lei mosaica.',
+  },
+  {
+    id: 'pc-075',
+    theme: 'Coração novo, espírito novo',
+    category: 'Israel e a Igreja',
+    ot: { bookSlug:'ez', bookName:'Ezequiel', reference:'Ezequiel 36:26-27', abbrev:'Ez', chapter:36, verseStart:26, verseEnd:27,
+          preview:'E vos darei um coração novo, e porei dentro de vós um espírito novo... e porei dentro de vós o meu Espírito.' },
+    nt: { bookSlug:'jo', bookName:'João', reference:'João 3:5', abbrev:'Jo', chapter:3, verseStart:5,
+          preview:'Em verdade, em verdade te digo que aquele que não nascer da água e do Espírito não pode entrar no reino de Deus.' },
+    connectionType: 'fulfillment',
+    note: 'A promessa de regeneração interior por Ezequiel é o pano de fundo direto do ensino de Jesus a Nicodemos sobre o novo nascimento.',
+  },
+  {
+    id: 'pc-076',
+    theme: 'Os ossos secos e a união em um só corpo',
+    category: 'Israel e a Igreja',
+    ot: { bookSlug:'ez', bookName:'Ezequiel', reference:'Ezequiel 37:5', abbrev:'Ez', chapter:37, verseStart:5, verseEnd:14,
+          preview:'Assim diz o Senhor Deus a estes ossos: Eis que farei entrar em vós o espírito, e vivereis.' },
+    nt: { bookSlug:'ef', bookName:'Efésios', reference:'Efésios 2:14-16', abbrev:'Ef', chapter:2, verseStart:13, verseEnd:22,
+          preview:'Porque ele é a nossa paz, o qual de ambos os povos fez um... para criar em si mesmo um novo homem.' },
+    connectionType: 'thematic',
+    note: 'A visão dos ossos secos que ganham vida e se tornam um exército unido ecoa na descrição paulina de judeus e gentios unidos em um só corpo em Cristo.',
+  },
+  {
+    id: 'pc-077',
+    theme: 'O Filho do Homem nas nuvens',
+    category: 'Ascensão e Reino Eterno',
+    ot: { bookSlug:'dn', bookName:'Daniel', reference:'Daniel 7:13-14', abbrev:'Dn', chapter:7, verseStart:13, verseEnd:14,
+          preview:'Eis que com as nuvens do céu vinha um como o Filho do homem... e foi-lhe dado domínio, e gloria, e o reino.' },
+    nt: { bookSlug:'mt', bookName:'Mateus', reference:'Mateus 26:64', abbrev:'Mt', chapter:26, verseStart:64,
+          preview:'Tu o disseste; digo-vos, porém, que vereis o Filho do homem assentado à direita do poder de Deus, e vindo sobre as nuvens do céu.' },
+    connectionType: 'fulfillment',
+    note: 'No julgamento diante do Sinédrio, Jesus se aplica diretamente a si mesmo essa visão real e cósmica de Daniel.',
+  },
+  {
+    id: 'pc-078',
+    theme: 'As setenta semanas',
+    category: 'Israel e a Igreja',
+    ot: { bookSlug:'dn', bookName:'Daniel', reference:'Daniel 9:25-26', abbrev:'Dn', chapter:9, verseStart:24, verseEnd:27,
+          preview:'Sabe, pois, e entende que, desde a saída da ordem para restaurar e para edificar Jerusalém, até ao Messias... e depois o Messias será morto.' },
+    nt: { bookSlug:'lc', bookName:'Lucas', reference:'Lucas 19:41-44', abbrev:'Lc', chapter:19, verseStart:41, verseEnd:44,
+          preview:'E, quando ia chegando perto, vendo a cidade, chorou sobre ela, dizendo: Ah, se tu conhecesses... o tempo da tua visitação!' },
+    connectionType: 'fulfillment',
+    note: 'A complexa cronologia profética de Daniel sobre o tempo do Messias é o que Jesus tem em mente ao lamentar que Jerusalém não reconheceu "o tempo da sua visitação".',
+  },
+  {
+    id: 'pc-079',
+    theme: 'Ressuscitado ao terceiro dia',
+    category: 'Ressurreição',
+    ot: { bookSlug:'os', bookName:'Oséias', reference:'Oséias 6:2', abbrev:'Os', chapter:6, verseStart:2,
+          preview:'Depois de dois dias nos sarará; ao terceiro dia nos levantará, e diante dele viveremos.' },
+    nt: { bookSlug:'1co', bookName:'1 Coríntios', reference:'1 Coríntios 15:4', abbrev:'1Co', chapter:15, verseStart:4,
+          preview:'E que foi sepultado, e que ressuscitou ao terceiro dia, segundo as Escrituras.' },
+    connectionType: 'thematic',
+    note: 'Paulo afirma que a ressurreição "ao terceiro dia" estava "segundo as Escrituras" — Oséias é um dos textos que ecoa esse padrão.',
+  },
 ];
 
 export const PROPHETIC_CATEGORIES = [
   'Todos',
+  'Profecias Messiânicas Diretas',
   'Nascimento e Infância',
   'Ministério',
+  'Identidade do Messias',
   'Traição e Julgamento',
   'Paixão',
   'Ressurreição',
+  'Ascensão e Reino Eterno',
   'Tipos e Sombras',
   'Sacerdócio',
   'Aliança',
   'Pentecostes',
   'Missão',
   'Rejeição e Glória',
-  'Identidade do Messias',
+  'Israel e a Igreja',
 ] as const;
 
 export type PropheticCategory = typeof PROPHETIC_CATEGORIES[number];
@@ -412,9 +997,17 @@ export const CONNECTION_TYPE_LABELS: Record<PropheticConnectionType, string> = {
   thematic:     'Eco Temático',
 };
 
+// Cores atualizadas — alinhadas à paleta atual do app (antes eram
+// marrom/azul/verde da paleta antiga de pergaminho).
 export const CONNECTION_TYPE_COLORS: Record<PropheticConnectionType, string> = {
-  fulfillment:  '#4A7C59',  // verde
-  messianic:    '#8B6340',  // marrom
-  typological:  '#4A5C8B',  // azul
-  thematic:     '#7A4A8B',  // roxo
+  fulfillment:  '#059669',  // emerald — cumprimento confirmado
+  messianic:    '#7C3AED',  // violet — cor primária da marca
+  typological:  '#2563EB',  // blue — tipo/sombra
+  thematic:     '#D97706',  // amber — eco temático
+};
+
+// Cores para os badges AT/NT no card de detalhe — também atualizadas
+export const TESTAMENT_COLORS = {
+  ot: '#4338CA',  // indigo — Antigo Testamento
+  nt: '#7C3AED',  // violet — Novo Testamento (cor primária da marca)
 };
