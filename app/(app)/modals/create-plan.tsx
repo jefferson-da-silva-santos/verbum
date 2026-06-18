@@ -77,6 +77,7 @@ export default function CreatePlanModal() {
           Criar Plano · Passo {step}/3
         </Text>
         <View style={{ width: 22 }} />
+        
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
