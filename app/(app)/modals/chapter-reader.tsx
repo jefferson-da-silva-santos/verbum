@@ -23,6 +23,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets }            from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { LinearGradient }               from 'expo-linear-gradient';
 import { MaterialCommunityIcons }       from '@expo/vector-icons';
 
 import { useTheme }          from '../../../src/context/ThemeContext';
@@ -33,11 +34,12 @@ import { VerseItem }        from '../../../src/components/bible/VerseItem';
 import { ChapterHeader, VerseActionSheet } from '../../../src/components/bible/ChapterHeader';
 import { findBook }         from '../../../src/constants/bible';
 import { highlightRepo, favoriteRepo } from '../../../src/database/repositories';
-import { SermonRepository }            from '../../../src/database/repositories/SermonRepository';
 import { ThematicMapRepository } from '@/src/database/repositories/ThematicMapRepository';
 import type { Highlight }              from '../../../src/database/types';
 import type { HighlightColor }         from '../../../src/constants/bible';
 import { HIGHLIGHT_DEFINITIONS }       from '../../../src/constants/bible';
+import { AddToSermonSheet }            from '../../../src/components/sermon/AddToSermonSheet';
+import type { VerseToAdd }             from '../../../src/components/sermon/AddToSermonSheet';
 
 export default function ChapterReaderModal() {
   const { tokens } = useTheme();
@@ -58,6 +60,16 @@ export default function ChapterReaderModal() {
 
   const [highlights, setHighlights] = useState<Record<number, Highlight>>({});
   const [selected,   setSelected]   = useState<{ number: number; text: string } | null>(null);
+  const [addToSermonVerse, setAddToSermonVerse] = useState<VerseToAdd | null>(null);
+
+  // Progresso de leitura — barra fina sob a navbar, como Kindle/Medium
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const handleScroll = useCallback((e: any) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const scrollable = contentSize.height - layoutMeasurement.height;
+    if (scrollable <= 0) { setScrollProgress(1); return; }
+    setScrollProgress(Math.min(1, Math.max(0, contentOffset.y / scrollable)));
+  }, []);
 
   const chapterId = `${bookSlug}-${chapterNum}`;
 
@@ -146,41 +158,19 @@ export default function ChapterReaderModal() {
     }, 250);
   }, [selected, book, abbrev, chapterNum]);
 
-  const handleAddToSermon = useCallback(async () => {
-    if (!user || !selected || !book) return;
-    const sel = { ...selected }; // captura antes de limpar
+  const handleAddToSermon = useCallback(() => {
+    if (!selected || !book) return;
+    const sel = { ...selected };
     setSelected(null);
-    try {
-      const sermons = await SermonRepository.findAll(user.id);
-      if (sermons.length === 0) {
-        Alert.alert('Nenhum sermão', 'Crie um sermão primeiro no Caderno do Pregador.', [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Abrir Caderno', onPress: () => setTimeout(() => router.push('/(app)/modals/sermon-list'), 300) },
-        ]);
-        return;
-      }
-      if (sermons.length === 1) {
-        const s = sermons[0];
-        const already = await SermonRepository.isVerseInSermon(s.id, book.slug, chapterNum, sel.number);
-        if (already) { Alert.alert('Já adicionado', `Este versículo já está em "${s.title}".`); return; }
-        await SermonRepository.addVerse({ sermonId: s.id, bookSlug: book.slug, bookName: book.name, chapter: chapterNum, verse: sel.number, verseText: sel.text });
-        Alert.alert('Adicionado ✓', `Versículo em "${s.title}".`);
-        return;
-      }
-      Alert.alert('Adicionar ao sermão', 'Escolha o sermão:', [
-        ...sermons.slice(0, 5).map(s => ({
-          text: s.title.length > 28 ? s.title.slice(0, 28) + '…' : s.title,
-          onPress: async () => {
-            const already = await SermonRepository.isVerseInSermon(s.id, book.slug, chapterNum, sel.number);
-            if (already) { Alert.alert('Já adicionado'); return; }
-            await SermonRepository.addVerse({ sermonId: s.id, bookSlug: book.slug, bookName: book.name, chapter: chapterNum, verse: sel.number, verseText: sel.text });
-            Alert.alert('Adicionado ✓');
-          },
-        })),
-        { text: 'Cancelar', style: 'cancel' },
-      ]);
-    } catch (e) { console.warn('[Reader] Erro ao adicionar ao sermão:', e); }
-  }, [user, selected, book, chapterNum]);
+    setAddToSermonVerse({
+      bookSlug: book.slug,
+      bookName: book.name,
+      chapter:  chapterNum,
+      verse:    sel.number,
+      verseText: sel.text,
+      reference: `${abbrev} ${chapterNum}:${sel.number}`,
+    });
+  }, [selected, book, chapterNum, abbrev]);
 
   const handleAddToMap = useCallback(async () => {
     if (!user || !selected || !book) return;
@@ -196,7 +186,7 @@ export default function ChapterReaderModal() {
         return;
       }
       Alert.alert('Adicionar ao mapa', 'Escolha o mapa:', [
-        ...maps.slice(0, 5).map(m => ({
+        ...maps.slice(0, 5).map((m:any) => ({
           text: m.name,
           onPress: async () => {
             await ThematicMapRepository.addVerse({ mapId: m.id, bookSlug: book.slug, bookName: book.name, chapter: chapterNum, verse: sel.number, verseText: sel.text });
@@ -221,7 +211,7 @@ export default function ChapterReaderModal() {
       <StatusBar barStyle="dark-content" backgroundColor={tokens.bgPrimary} />
 
       {/* Navbar */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: tokens.borderLight }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 }}>
         <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
           <MaterialCommunityIcons name="close" size={22} color={tokens.iconPrimary} />
         </TouchableOpacity>
@@ -236,17 +226,41 @@ export default function ChapterReaderModal() {
         </TouchableOpacity>
       </View>
 
+      {/* Barra de progresso de leitura — fina, discreta, enche conforme rola */}
+      <View style={{ height: 3, backgroundColor: tokens.borderLight }}>
+        <LinearGradient
+          colors={['#6D28D9', '#8B5CF6']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{ height: '100%', width: `${scrollProgress * 100}%` }}
+        />
+      </View>
+
       {/* Conteúdo */}
       {isLoading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-          <ActivityIndicator size="large" color={tokens.actionPrimary} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 18 }}>
+          <LinearGradient
+            colors={[tokens.actionPrimary + '25', tokens.actionPrimary + '08']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <ActivityIndicator size="large" color={tokens.actionPrimary} />
+          </LinearGradient>
           <Text style={{ fontSize: 14, color: tokens.textTertiary }}>
             Carregando {book?.abbr ?? ''} {chapterNum}…
           </Text>
         </View>
       ) : error ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 16 }}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={52} color={tokens.warning} />
+          <LinearGradient
+            colors={['#F59E0B30', '#F59E0B10']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <MaterialCommunityIcons name="alert-circle-outline" size={40} color="#F59E0B" />
+          </LinearGradient>
           <Text style={{ fontSize: 17, fontWeight: '700', color: tokens.textPrimary, textAlign: 'center' }}>Não foi possível carregar</Text>
           <View style={{ backgroundColor: tokens.bgCard, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: tokens.borderLight, width: '100%' }}>
             <Text style={{ fontSize: 12, color: tokens.error }}>{error.message}</Text>
@@ -259,6 +273,8 @@ export default function ChapterReaderModal() {
         <FlatList
           data={data?.verses ?? []}
           keyExtractor={v => String(v.number)}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           ListHeaderComponent={
             book && data
               ? <ChapterHeader bookName={book.name} chapterNum={chapterNum} totalVerses={data.totalVerses} onStudy={handleStudy} />
@@ -291,20 +307,30 @@ export default function ChapterReaderModal() {
 
         <TouchableOpacity
           onPress={handleMarkRead}
-          style={{
-            flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-            backgroundColor: isRead ? tokens.successBg : tokens.actionPrimary,
-            borderRadius: 14, paddingVertical: 13, gap: 8,
-          }}
+          style={{ flex: 1, borderRadius: 14, overflow: 'hidden' }}
         >
-          <MaterialCommunityIcons
-            name={isRead ? 'check-circle' : 'check-circle-outline'}
-            size={20}
-            color={isRead ? tokens.success : tokens.actionPrimaryText}
-          />
-          <Text style={{ fontSize: 15, fontWeight: '700', color: isRead ? tokens.success : tokens.actionPrimaryText }}>
-            {isRead ? 'Lido ✓' : 'Marcar como lido'}
-          </Text>
+          {isRead ? (
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+              backgroundColor: tokens.successBg, paddingVertical: 13, gap: 8,
+            }}>
+              <MaterialCommunityIcons name="check-circle" size={20} color={tokens.success} />
+              <Text style={{ fontSize: 15, fontWeight: '700', color: tokens.success }}>Lido ✓</Text>
+            </View>
+          ) : (
+            <LinearGradient
+              colors={['#6D28D9', '#8B5CF6']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                paddingVertical: 13, gap: 8,
+              }}
+            >
+              <MaterialCommunityIcons name="check-circle-outline" size={20} color="white" />
+              <Text style={{ fontSize: 15, fontWeight: '700', color: 'white' }}>Marcar como lido</Text>
+            </LinearGradient>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -338,6 +364,13 @@ export default function ChapterReaderModal() {
           isFavorited={false}
         />
       )}
+
+      {/* Adicionar ao sermão — bottom sheet customizado, substitui os Alert.alert antigos */}
+      <AddToSermonSheet
+        visible={!!addToSermonVerse}
+        verse={addToSermonVerse}
+        onClose={() => setAddToSermonVerse(null)}
+      />
     </View>
   );
 }

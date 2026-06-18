@@ -165,6 +165,13 @@ export default function PulpitModeModal() {
   const [ctrlVisible, setCtrl]        = useState(true);
   const [showJumpBar, setShowJumpBar] = useState(false);
 
+  // NOVO: modo de visualização — 'slides' (tela por tela, toque/swipe)
+  // ou 'scroll' (tudo numa rolagem contínua, como teleprompter)
+  const [viewMode, setViewMode] = useState<'slides' | 'scroll'>('slides');
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const scrollRef   = useRef<ScrollView>(null);
+  const sectionYRef = useRef<Record<number, number>>({});
+
   const ctrlTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const slideAnim   = useRef(new Animated.Value(0)).current;
   const opacityCtrl = useRef(new Animated.Value(1)).current;
@@ -306,6 +313,37 @@ export default function PulpitModeModal() {
     if (idx >= 0) goToIndex(idx);
   }, [slides, goToIndex]);
 
+  // ── Modo de rolagem contínua ───────────────────────────────────────
+
+  const scrollToKind = useCallback((kind: SectionKind) => {
+    const idx = slides.findIndex(s => s.kind === kind);
+    if (idx < 0) return;
+    const y = sectionYRef.current[idx] ?? 0;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - 8), animated: true });
+  }, [slides]);
+
+  // Navegação rápida que funciona nos dois modos — usada pela barra de seções
+  const handleJump = useCallback((kind: SectionKind) => {
+    if (viewMode === 'scroll') scrollToKind(kind);
+    else jumpToKind(kind);
+  }, [viewMode, scrollToKind, jumpToKind]);
+
+  // Acompanha a posição de rolagem e mantém "current" sincronizado,
+  // para que alternar de volta ao modo Slides preserve aproximadamente
+  // onde o pregador estava.
+  const handleScrollModeScroll = useCallback((e: any) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const scrollable = contentSize.height - layoutMeasurement.height;
+    setScrollProgress(scrollable > 0 ? Math.min(1, Math.max(0, contentOffset.y / scrollable)) : 1);
+
+    const y = contentOffset.y + 80;
+    const entries = Object.entries(sectionYRef.current).map(([i, sy]) => ({ i: Number(i), sy: sy as number }));
+    entries.sort((a, b) => a.sy - b.sy);
+    let nearest = 0;
+    for (const entry of entries) { if (entry.sy <= y) nearest = entry.i; else break; }
+    setCurrent(nearest);
+  }, []);
+
   // ── Gestos ───────────────────────────────────────────────────────
 
   const panResponder = PanResponder.create({
@@ -352,6 +390,104 @@ export default function PulpitModeModal() {
   }
 
   // ─────────────────────────────────────────────────────────────────
+  // MODO ROLAGEM — tudo numa rolagem contínua vertical, como teleprompter
+  // ─────────────────────────────────────────────────────────────────
+
+  if (viewMode === 'scroll') {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <StatusBar hidden />
+
+        {/* Barra fina de progresso da rolagem */}
+        <View style={{ height: 3, backgroundColor: 'rgba(255,255,255,0.08)' }}>
+          <View style={{ height: '100%', width: `${scrollProgress * 100}%`, backgroundColor: C.gold }} />
+        </View>
+
+        {/* Header — sempre visível no modo rolagem (sem auto-hide, já que o gesto principal é o scroll) */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: 10, gap: 10 }}>
+          <TouchableOpacity onPress={() => router.back()} style={{ padding: 10, backgroundColor: C.bgOverlay, borderRadius: 20 }}>
+            <MaterialCommunityIcons name="close" size={20} color="white" />
+          </TouchableOpacity>
+
+          <Text style={{ flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.55)', fontWeight: '600' }} numberOfLines={1}>
+            {decodeURIComponent(String(title)) || (slides[0]?.kind === 'cover' ? slides[0].title : '')}
+          </Text>
+
+          <TouchableOpacity onPress={() => setViewMode('slides')} style={{ padding: 10, backgroundColor: C.bgOverlay, borderRadius: 20 }}>
+            <MaterialCommunityIcons name="view-carousel-outline" size={18} color="white" />
+          </TouchableOpacity>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.bgOverlay, borderRadius: 20, paddingVertical: 7, paddingHorizontal: 12 }}>
+            <TouchableOpacity onPress={() => setFontSize(s => Math.max(15, s - 2))} style={{ padding: 3 }}>
+              <Text style={{ fontSize: 13, color: 'white', fontWeight: '700' }}>A−</Text>
+            </TouchableOpacity>
+            <View style={{ width: 1, height: 14, backgroundColor: C.btnBorder, marginHorizontal: 3 }} />
+            <TouchableOpacity onPress={() => setFontSize(s => Math.min(40, s + 2))} style={{ padding: 3 }}>
+              <Text style={{ fontSize: 16, color: 'white', fontWeight: '700' }}>A+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Chips de seção — pular direto para qualquer parte, rolando até lá */}
+        {distinctSections.length > 1 && (
+          <ScrollView
+            horizontal showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0, flexShrink: 0, borderBottomWidth: 1, borderBottomColor: C.divider }}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, gap: 8 }}
+          >
+            {distinctSections.map(kind => {
+              const label =
+                kind === 'cover' ? 'Capa' :
+                kind === 'verse' ? 'Versículos' :
+                SECTION_META[kind as Exclude<SectionKind, 'cover' | 'verse'>]?.heading ?? kind;
+              const isActive = slides[current]?.kind === kind;
+              return (
+                <TouchableOpacity
+                  key={kind}
+                  onPress={() => scrollToKind(kind)}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 6,
+                    paddingVertical: 7, paddingHorizontal: 12, borderRadius: 18,
+                    backgroundColor: isActive ? C.gold : 'rgba(255,255,255,0.08)',
+                  }}
+                >
+                  <MaterialCommunityIcons name={JUMP_ICON[kind]} size={13} color={isActive ? '#1A1208' : C.text} />
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: isActive ? '#1A1208' : C.text }}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+
+        {/* Conteúdo — todos os slides empilhados, um contínuo abaixo do outro */}
+        <ScrollView
+          ref={scrollRef}
+          onScroll={handleScrollModeScroll}
+          scrollEventThrottle={32}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}
+        >
+          {slides.map((s, i) => (
+            <View
+              key={i}
+              onLayout={e => { sectionYRef.current[i] = e.nativeEvent.layout.y; }}
+              style={{
+                paddingVertical: 44, paddingHorizontal: 28,
+                borderBottomWidth: i < slides.length - 1 ? 1 : 0,
+                borderBottomColor: C.divider,
+              }}
+            >
+              {renderSlide(s, fontSize, version, true)}
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // MODO SLIDES — uma tela por vez, toque/swipe para avançar (padrão)
+  // ─────────────────────────────────────────────────────────────────
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }} {...panResponder.panHandlers}>
@@ -392,6 +528,10 @@ export default function PulpitModeModal() {
               {decodeURIComponent(String(title)) || (slide.kind === 'cover' ? slide.title : '')}
             </Text>
 
+            <TouchableOpacity onPress={() => setViewMode('scroll')} style={{ padding: 10, backgroundColor: C.bgOverlay, borderRadius: 20 }}>
+              <MaterialCommunityIcons name="format-list-text" size={18} color="white" />
+            </TouchableOpacity>
+
             <TouchableOpacity onPress={() => setShowJumpBar(v => !v)} style={{ padding: 10, backgroundColor: showJumpBar ? C.gold : C.bgOverlay, borderRadius: 20 }}>
               <MaterialCommunityIcons name="view-grid-outline" size={18} color={showJumpBar ? '#1A1208' : 'white'} />
             </TouchableOpacity>
@@ -418,7 +558,7 @@ export default function PulpitModeModal() {
                 return (
                   <TouchableOpacity
                     key={kind}
-                    onPress={() => { jumpToKind(kind); setShowJumpBar(false); }}
+                    onPress={() => { handleJump(kind); setShowJumpBar(false); }}
                     style={{
                       flexDirection: 'row', alignItems: 'center', gap: 6,
                       paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20,
@@ -461,7 +601,7 @@ export default function PulpitModeModal() {
 
 // ─── Renderização por tipo de slide ──────────────────────────────
 
-function renderSlide(slide: Slide, fontSize: number, version: string) {
+function renderSlide(slide: Slide, fontSize: number, version: string, scrollMode: boolean = false) {
   switch (slide.kind) {
 
     case 'cover':
@@ -512,7 +652,10 @@ function renderSlide(slide: Slide, fontSize: number, version: string) {
     case 'exegesis':
     case 'application':
       return (
-        <View style={{ width: '100%', height: '100%', gap: 20, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{
+          width: '100%', gap: 20, alignItems: 'center',
+          ...(scrollMode ? {} : { height: '100%', justifyContent: 'center' }),
+        }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <MaterialCommunityIcons name={slide.icon} size={16} color={C.gold} />
             <Text style={{ fontSize: 13, fontWeight: '700', color: C.gold, letterSpacing: 3, textTransform: 'uppercase' }}>
@@ -520,20 +663,58 @@ function renderSlide(slide: Slide, fontSize: number, version: string) {
             </Text>
           </View>
           <View style={{ width: 48, height: 1, backgroundColor: C.divider }} />
-          <ScrollView style={{ maxHeight: H * 0.55, width: '100%' }} showsVerticalScrollIndicator={false}>
+          {scrollMode ? (
+            // Modo rolagem: o ScrollView externo já cuida da rolagem —
+            // nada de ScrollView aninhada nem altura travada aqui.
             <Text style={{
               fontSize: fontSize * 0.72, color: C.text, textAlign: 'center',
               lineHeight: fontSize * 0.72 * 1.6, fontFamily: 'serif',
             }}>
               {slide.body}
             </Text>
-          </ScrollView>
+          ) : (
+            <ScrollView style={{ maxHeight: H * 0.55, width: '100%' }} showsVerticalScrollIndicator={false}>
+              <Text style={{
+                fontSize: fontSize * 0.72, color: C.text, textAlign: 'center',
+                lineHeight: fontSize * 0.72 * 1.6, fontFamily: 'serif',
+              }}>
+                {slide.body}
+              </Text>
+            </ScrollView>
+          )}
         </View>
       );
 
-    case 'outline':
+    case 'outline': {
+      const outlineList = (() => {
+        let mainCount = 0;
+        return slide.items.map(item => {
+          if (item.level === 0) mainCount += 1;
+          return (
+            <View key={item.id} style={{ flexDirection: 'row', gap: 12, marginLeft: item.level === 1 ? 32 : 0, alignItems: 'flex-start' }}>
+              {item.level === 0 ? (
+                <Text style={{ fontSize: fontSize * 0.62, fontWeight: '800', color: C.gold, fontFamily: 'serif' }}>{mainCount}.</Text>
+              ) : (
+                <Text style={{ fontSize: fontSize * 0.5, color: C.goldDim }}>—</Text>
+              )}
+              <Text style={{
+                flex: 1, fontSize: item.level === 0 ? fontSize * 0.62 : fontSize * 0.5,
+                fontWeight: item.level === 0 ? '700' : '400',
+                color: item.level === 0 ? C.text : C.textDim,
+                fontFamily: 'serif', lineHeight: (item.level === 0 ? fontSize * 0.62 : fontSize * 0.5) * 1.4,
+              }}>
+                {item.text}
+              </Text>
+            </View>
+          );
+        });
+      })();
+
       return (
-        <View style={{ width: '100%', height: '100%', gap: 18, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{
+          width: '100%', gap: 18, alignItems: 'center',
+          ...(scrollMode ? {} : { height: '100%', justifyContent: 'center' }),
+        }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <MaterialCommunityIcons name="format-list-numbered" size={16} color={C.gold} />
             <Text style={{ fontSize: 13, fontWeight: '700', color: C.gold, letterSpacing: 3, textTransform: 'uppercase' }}>
@@ -541,32 +722,17 @@ function renderSlide(slide: Slide, fontSize: number, version: string) {
             </Text>
           </View>
           <View style={{ width: 48, height: 1, backgroundColor: C.divider }} />
-          <ScrollView style={{ maxHeight: H * 0.6, width: '100%' }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingHorizontal: 8 }}>
-            {(() => {
-              let mainCount = 0;
-              return slide.items.map(item => {
-                if (item.level === 0) mainCount += 1;
-                return (
-                  <View key={item.id} style={{ flexDirection: 'row', gap: 12, marginLeft: item.level === 1 ? 32 : 0, alignItems: 'flex-start' }}>
-                    {item.level === 0 ? (
-                      <Text style={{ fontSize: fontSize * 0.62, fontWeight: '800', color: C.gold, fontFamily: 'serif' }}>{mainCount}.</Text>
-                    ) : (
-                      <Text style={{ fontSize: fontSize * 0.5, color: C.goldDim }}>—</Text>
-                    )}
-                    <Text style={{
-                      flex: 1, fontSize: item.level === 0 ? fontSize * 0.62 : fontSize * 0.5,
-                      fontWeight: item.level === 0 ? '700' : '400',
-                      color: item.level === 0 ? C.text : C.textDim,
-                      fontFamily: 'serif', lineHeight: (item.level === 0 ? fontSize * 0.62 : fontSize * 0.5) * 1.4,
-                    }}>
-                      {item.text}
-                    </Text>
-                  </View>
-                );
-              });
-            })()}
-          </ScrollView>
+          {scrollMode ? (
+            <View style={{ width: '100%', gap: 16, paddingHorizontal: 8 }}>
+              {outlineList}
+            </View>
+          ) : (
+            <ScrollView style={{ maxHeight: H * 0.6, width: '100%' }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingHorizontal: 8 }}>
+              {outlineList}
+            </ScrollView>
+          )}
         </View>
       );
+    }
   }
 }

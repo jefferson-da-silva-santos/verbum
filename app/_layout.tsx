@@ -129,7 +129,7 @@ function RootNavigator() {
       {/* ── DEMAIS MODAIS ── */}
       <Stack.Screen name="(app)/modals/create-plan"           options={{ presentation: 'modal' }} />
       <Stack.Screen name="(app)/modals/note-editor"           options={{ presentation: 'modal' }} />
-      <Stack.Screen name="(app)/modals/search"                options={{ presentation: 'modal' }} />
+      <Stack.Screen name="(app)/modals/search"                options={{ presentation: 'modal' }} />=
       <Stack.Screen name="(app)/modals/settings"              options={{ presentation: 'modal' }} />
       <Stack.Screen name="(app)/modals/achievements"          options={{ presentation: 'modal' }} />
       <Stack.Screen name="(app)/modals/favorites"             options={{ presentation: 'modal' }} />
@@ -138,6 +138,7 @@ function RootNavigator() {
       <Stack.Screen name="(app)/modals/book-selector"         options={{ presentation: 'modal' }} />
       <Stack.Screen name="(app)/modals/calibrate-speed"          options={{ presentation: 'modal' }} />
       <Stack.Screen name="(app)/modals/plan-detail"             options={{ presentation: 'modal' }} />
+      <Stack.Screen name="(app)/modals/plan-editor"             options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

@@ -36,7 +36,20 @@ import { useTheme }         from '../../../src/context/ThemeContext';
 import { SermonRepository } from '../../../src/database/repositories/SermonRepository';
 import type { SermonWithVerses, SermonStatus } from '../../../src/database/types';
 import { SERMON_STATUS_LABELS, SERMON_STATUS_COLORS } from '../../../src/database/types';
+import { VersePickerModal } from '../../../src/components/sermon/VersePickerModal';
+import type { PickedVerse } from '../../../src/components/sermon/VersePickerModal';
 
+// ─── Outline estruturado ──────────────────────────────────────────
+//
+// Adicione este tipo em src/database/featureTypes.ts (se ainda não existir):
+//
+//   export interface SermonOutlineItem {
+//     id:    string;
+//     level: 0 | 1;   // 0 = ponto principal, 1 = sub-ponto
+//     text:  string;
+//   }
+//
+// E garanta que UpdateSermonInput tenha: outline?: SermonOutlineItem[] | null
 
 export interface SermonOutlineItem {
   id:    string;
@@ -96,6 +109,8 @@ export default function SermonEditorModal() {
   const [exegesis,    setExegesis]    = useState('');
   const [outlineItems, setOutlineItems] = useState<SermonOutlineItem[]>([]);
   const [application, setApplication] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [isAddingVerses, setIsAddingVerses] = useState(false);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -241,6 +256,26 @@ export default function SermonEditorModal() {
     load();
   };
 
+  // Recebe os versículos escolhidos no VersePickerModal e vincula ao sermão
+  const handleVersesPicked = async (picked: PickedVerse[]) => {
+    if (!sermonId) return;
+    setPickerOpen(false);
+    setIsAddingVerses(true);
+    try {
+      for (const v of picked) {
+        const already = await SermonRepository.isVerseInSermon(sermonId, v.bookSlug, v.chapter, v.verse);
+        if (already) continue;
+        await SermonRepository.addVerse({
+          sermonId, bookSlug: v.bookSlug, bookName: v.bookName,
+          chapter: v.chapter, verse: v.verse, verseText: v.verseText,
+        });
+      }
+      await load();
+    } finally {
+      setIsAddingVerses(false);
+    }
+  };
+
   // ── Progresso das abas ───────────────────────────────────────────
 
   const done: Record<Tab, boolean> = {
@@ -309,17 +344,38 @@ export default function SermonEditorModal() {
           </View>
         </View>
 
+        {/* Botão para escolher versículo direto daqui, sem precisar ir até o leitor */}
+        <TouchableOpacity
+          onPress={() => setPickerOpen(true)}
+          disabled={isAddingVerses}
+          style={{
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+            backgroundColor: tokens.actionPrimary + '12', borderRadius: 12, paddingVertical: 12,
+            borderWidth: 1, borderColor: tokens.actionPrimary + '30',
+          }}
+        >
+          {isAddingVerses ? (
+            <ActivityIndicator size="small" color={tokens.actionPrimary} />
+          ) : (
+            <MaterialCommunityIcons name="book-search-outline" size={18} color={tokens.actionPrimary} />
+          )}
+          <Text style={{ fontSize: 13.5, fontWeight: '700', color: tokens.actionPrimary }}>
+            {isAddingVerses ? 'Adicionando…' : 'Escolher versículo da Bíblia'}
+          </Text>
+        </TouchableOpacity>
+
         {(sermon?.verses.length ?? 0) === 0 ? (
           <View style={{ backgroundColor: tokens.bgCard, borderRadius: 14, padding: 20, borderWidth: 1, borderColor: tokens.borderLight, alignItems: 'center', gap: 12 }}>
             <MaterialCommunityIcons name="book-plus-outline" size={36} color={tokens.iconMuted} />
             <Text style={{ fontSize: 14, color: tokens.textTertiary, textAlign: 'center', lineHeight: 22 }}>
-              No leitor, faça <Text style={{ fontWeight: '700' }}>long press</Text> em qualquer versículo e toque em{' '}
-              <Text style={{ fontWeight: '700', color: tokens.actionPrimary }}>{`"Adicionar ao sermão"`}</Text> para vinculá-lo aqui.
+              Toque em <Text style={{ fontWeight: '700', color: tokens.actionPrimary }}>{`"Escolher versículo da Bíblia"`}</Text> acima,
+              ou no leitor faça <Text style={{ fontWeight: '700' }}>long press</Text> em qualquer versículo e toque em{' '}
+              <Text style={{ fontWeight: '700', color: tokens.actionPrimary }}>{`"Adicionar ao sermão"`}</Text>.
             </Text>
           </View>
         ) : (
           <View style={{ gap: 8 }}>
-            {sermon!.verses.map(v => (
+            {sermon!.verses.map((v: any) => (
               <View key={v.id} style={{ backgroundColor: tokens.bgCard, borderRadius: 14, borderWidth: 1, borderColor: tokens.borderLight, flexDirection: 'row', alignItems: 'flex-start', padding: 14, gap: 12 }}>
                 <View style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0, backgroundColor: tokens.actionPrimary + '15', alignItems: 'center', justifyContent: 'center' }}>
                   <MaterialCommunityIcons name="book-open-variant" size={18} color={tokens.actionPrimary} />
@@ -573,6 +629,13 @@ export default function SermonEditorModal() {
       <View style={{ flex: 1 }}>
         {renderContent()}
       </View>
+
+      {/* Seletor de versículo — Livro → Capítulo → Versículos, focado, não a área Bíblia completa */}
+      <VersePickerModal
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onConfirm={handleVersesPicked}
+      />
     </KeyboardAvoidingView>
   );
 }

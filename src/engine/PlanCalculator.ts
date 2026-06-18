@@ -19,7 +19,7 @@ import {
   AGGRESSIVE_CHAPTERS_THRESHOLD,
   MAX_CHAPTERS_PER_DAY,
   MIN_MINUTES_PER_DAY,
-} from "../constants/bible";
+} from '../constants/bible';
 
 import {
   parseIsoDate,
@@ -27,18 +27,19 @@ import {
   addActiveDays,
   countActiveDays,
   activeDaysPerWeek,
-} from "./dateHelpers";
+} from './dateHelpers';
 
 // ─────────────────────────────────────────────
 // ERROS
 // ─────────────────────────────────────────────
 
 export type PlanErrorCode =
-  | "EMPTY_SCOPE" // nenhum livro selecionado
-  | "ZERO_CHAPTERS" // scope selecionado não tem capítulos
-  | "NO_ACTIVE_DAYS" // todos os dias da semana são de descanso
-  | "DEADLINE_IN_PAST" // data-alvo <= data de início
-  | "PACE_EXCEEDS_MAX"; // > MAX_CHAPTERS_PER_DAY cap/dia (prazo impossível)
+  | 'EMPTY_SCOPE'        // nenhum livro selecionado
+  | 'ZERO_CHAPTERS'      // scope selecionado não tem capítulos
+  | 'NO_ACTIVE_DAYS'     // todos os dias da semana são de descanso
+  | 'DEADLINE_IN_PAST'   // data-alvo <= data de início
+  | 'PACE_EXCEEDS_MAX'   // > MAX_CHAPTERS_PER_DAY cap/dia (prazo impossível)
+  | 'INVALID_INPUT';     // número ou data de entrada não-finito/inválido (NaN, Invalid Date)
 
 export class PlanCalculationError extends Error {
   constructor(
@@ -46,7 +47,7 @@ export class PlanCalculationError extends Error {
     message: string,
   ) {
     super(message);
-    this.name = "PlanCalculationError";
+    this.name = 'PlanCalculationError';
   }
 }
 
@@ -55,11 +56,11 @@ export class PlanCalculationError extends Error {
 // ─────────────────────────────────────────────
 
 export type PlanWarning =
-  | "time_below_minimum" // minutos/dia insuficientes para 1 cap completo
-  | "adjusted_to_one_chapter" // time mode: resultado < 1, ajustado para 1
-  | "aggressive_pace" // >10 caps/dia — difícil mas viável
-  | "very_aggressive_pace" // >20 caps/dia — muito exigente
-  | "deadline_very_soon"; // < 7 dias para o prazo
+  | 'time_below_minimum'       // minutos/dia insuficientes para 1 cap completo
+  | 'adjusted_to_one_chapter'  // time mode: resultado < 1, ajustado para 1
+  | 'aggressive_pace'          // >10 caps/dia — difícil mas viável
+  | 'very_aggressive_pace'     // >20 caps/dia — muito exigente
+  | 'deadline_very_soon';      // < 7 dias para o prazo
 
 // ─────────────────────────────────────────────
 // TIPOS DE ENTRADA
@@ -80,19 +81,19 @@ export interface BasePlanInput {
 }
 
 export interface ChaptersModeInput extends BasePlanInput {
-  mode: "chapters";
+  mode: 'chapters';
   /** Número de capítulos que o usuário quer ler por dia ativo */
   chaptersPerDay: number;
 }
 
 export interface TimeModeInput extends BasePlanInput {
-  mode: "time";
+  mode: 'time';
   /** Minutos que o usuário quer dedicar por dia ativo */
   minutesPerDay: number;
 }
 
 export interface DeadlineModeInput extends BasePlanInput {
-  mode: "deadline";
+  mode: 'deadline';
   /** Data-alvo de conclusão (ISO date) */
   targetDate: string;
 }
@@ -105,31 +106,31 @@ export type PlanInput = ChaptersModeInput | TimeModeInput | DeadlineModeInput;
 
 export interface PlanCalculationResult {
   // ── Ritmo ──────────────────────────────────
-  chaptersPerDay: number;
-  minutesPerDay: number;
+  chaptersPerDay:       number;
+  minutesPerDay:        number;
 
   // ── Volume ─────────────────────────────────
-  totalChapters: number;
-  totalReadingMinutes: number;
+  totalChapters:        number;
+  totalReadingMinutes:  number;
 
   // ── Prazo ──────────────────────────────────
   /** ISO date da data estimada de conclusão */
-  estimatedEndDate: string;
+  estimatedEndDate:     string;
   /** Dias corridos do início ao fim (incluindo descanso) */
-  totalCalendarDays: number;
+  totalCalendarDays:    number;
   /** Dias com leitura efetiva */
-  totalActiveDays: number;
+  totalActiveDays:      number;
 
   // ── Diagnóstico ────────────────────────────
-  warnings: PlanWarning[];
-  isAggressive: boolean; // chaptersPerDay > AGGRESSIVE_CHAPTERS_THRESHOLD
-  isVeryAggressive: boolean; // chaptersPerDay > 20
+  warnings:             PlanWarning[];
+  isAggressive:         boolean;  // chaptersPerDay > AGGRESSIVE_CHAPTERS_THRESHOLD
+  isVeryAggressive:     boolean;  // chaptersPerDay > 20
 
   // ── Metadados do input ─────────────────────
-  mode: PlanInput["mode"];
-  startDate: string;
-  targetDate: string | null;
-  skipWeekdays: readonly number[];
+  mode:                 PlanInput['mode'];
+  startDate:            string;
+  targetDate:           string | null;
+  skipWeekdays:         readonly number[];
   avgMinutesPerChapter: number;
 }
 
@@ -138,18 +139,16 @@ export interface PlanCalculationResult {
 // ─────────────────────────────────────────────
 
 export class PlanCalculator {
+
   /**
    * Ponto de entrada unificado — despacha para o modo correto.
    * Lança PlanCalculationError para entradas inviáveis.
    */
   static calculate(input: PlanInput): PlanCalculationResult {
     switch (input.mode) {
-      case "chapters":
-        return PlanCalculator.byChapters(input);
-      case "time":
-        return PlanCalculator.byTime(input);
-      case "deadline":
-        return PlanCalculator.byDeadline(input);
+      case 'chapters': return PlanCalculator.byChapters(input);
+      case 'time':     return PlanCalculator.byTime(input);
+      case 'deadline': return PlanCalculator.byDeadline(input);
     }
   }
 
@@ -159,41 +158,45 @@ export class PlanCalculator {
   // ──────────────────────────────────────────
 
   static byChapters(input: ChaptersModeInput): PlanCalculationResult {
-    const avg = input.avgMinutesPerChapter ?? DEFAULT_MINUTES_PER_CHAPTER;
+    const avg   = input.avgMinutesPerChapter ?? DEFAULT_MINUTES_PER_CHAPTER;
     const total = PlanCalculator.validateScope(input.bookSlugs);
     PlanCalculator.validateActiveDays(input.skipWeekdays);
+
+    // FIX: sem isto, chaptersPerDay inválido (undefined/NaN/0) propagava
+    // silenciosamente — Math.max(1, Math.floor(NaN)) === NaN, e nenhuma
+    // verificação abaixo pega isso porque NaN > x é sempre false.
+    if (!Number.isFinite(input.chaptersPerDay) || input.chaptersPerDay <= 0) {
+      throw new PlanCalculationError(
+        'INVALID_INPUT',
+        `Número de capítulos por dia inválido: ${input.chaptersPerDay}.`,
+      );
+    }
 
     const cpd = Math.max(1, Math.floor(input.chaptersPerDay));
 
     const activeDaysNeeded = Math.ceil(total / cpd);
-    const startDate = parseIsoDate(input.startDate);
-    const endDate = addActiveDays(
-      startDate,
-      activeDaysNeeded,
-      input.skipWeekdays,
-    );
+    const startDate        = parseIsoDate(input.startDate);
+    const endDate          = addActiveDays(startDate, activeDaysNeeded, input.skipWeekdays);
 
     const warnings: PlanWarning[] = [];
-    if (cpd > 20) warnings.push("very_aggressive_pace");
-    else if (cpd > AGGRESSIVE_CHAPTERS_THRESHOLD)
-      warnings.push("aggressive_pace");
+    if (cpd > 20) warnings.push('very_aggressive_pace');
+    else if (cpd > AGGRESSIVE_CHAPTERS_THRESHOLD) warnings.push('aggressive_pace');
 
     return {
-      chaptersPerDay: cpd,
-      minutesPerDay: parseFloat((cpd * avg).toFixed(1)),
-      totalChapters: total,
-      totalReadingMinutes: parseFloat((total * avg).toFixed(1)),
-      estimatedEndDate: toIsoDate(endDate),
-      totalCalendarDays:
-        Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1,
-      totalActiveDays: activeDaysNeeded,
+      chaptersPerDay:       cpd,
+      minutesPerDay:        parseFloat((cpd * avg).toFixed(1)),
+      totalChapters:        total,
+      totalReadingMinutes:  parseFloat((total * avg).toFixed(1)),
+      estimatedEndDate:     toIsoDate(endDate),
+      totalCalendarDays:    Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1,
+      totalActiveDays:      activeDaysNeeded,
       warnings,
-      isAggressive: cpd > AGGRESSIVE_CHAPTERS_THRESHOLD,
-      isVeryAggressive: cpd > 20,
-      mode: "chapters",
-      startDate: input.startDate,
-      targetDate: null,
-      skipWeekdays: input.skipWeekdays,
+      isAggressive:         cpd > AGGRESSIVE_CHAPTERS_THRESHOLD,
+      isVeryAggressive:     cpd > 20,
+      mode:                 'chapters',
+      startDate:            input.startDate,
+      targetDate:           null,
+      skipWeekdays:         input.skipWeekdays,
       avgMinutesPerChapter: avg,
     };
   }
@@ -204,51 +207,53 @@ export class PlanCalculator {
   // ──────────────────────────────────────────
 
   static byTime(input: TimeModeInput): PlanCalculationResult {
-    const avg = input.avgMinutesPerChapter ?? DEFAULT_MINUTES_PER_CHAPTER;
+    const avg   = input.avgMinutesPerChapter ?? DEFAULT_MINUTES_PER_CHAPTER;
     const total = PlanCalculator.validateScope(input.bookSlugs);
     PlanCalculator.validateActiveDays(input.skipWeekdays);
 
+    // FIX: mesma proteção do byChapters, agora para minutesPerDay.
+    if (!Number.isFinite(input.minutesPerDay) || input.minutesPerDay <= 0) {
+      throw new PlanCalculationError(
+        'INVALID_INPUT',
+        `Minutos por dia inválido: ${input.minutesPerDay}.`,
+      );
+    }
+
     const warnings: PlanWarning[] = [];
-    let rawCpd = input.minutesPerDay / avg;
+    let   rawCpd = input.minutesPerDay / avg;
 
     if (input.minutesPerDay < MIN_MINUTES_PER_DAY) {
-      warnings.push("time_below_minimum");
+      warnings.push('time_below_minimum');
     }
 
     if (rawCpd < 1) {
-      warnings.push("adjusted_to_one_chapter");
+      warnings.push('adjusted_to_one_chapter');
       rawCpd = 1;
     }
 
     const cpd = Math.floor(rawCpd);
-    if (cpd > 20) warnings.push("very_aggressive_pace");
-    else if (cpd > AGGRESSIVE_CHAPTERS_THRESHOLD)
-      warnings.push("aggressive_pace");
+    if (cpd > 20) warnings.push('very_aggressive_pace');
+    else if (cpd > AGGRESSIVE_CHAPTERS_THRESHOLD) warnings.push('aggressive_pace');
 
     const activeDaysNeeded = Math.ceil(total / cpd);
-    const startDate = parseIsoDate(input.startDate);
-    const endDate = addActiveDays(
-      startDate,
-      activeDaysNeeded,
-      input.skipWeekdays,
-    );
+    const startDate        = parseIsoDate(input.startDate);
+    const endDate          = addActiveDays(startDate, activeDaysNeeded, input.skipWeekdays);
 
     return {
-      chaptersPerDay: cpd,
-      minutesPerDay: parseFloat(input.minutesPerDay.toFixed(1)),
-      totalChapters: total,
-      totalReadingMinutes: parseFloat((total * avg).toFixed(1)),
-      estimatedEndDate: toIsoDate(endDate),
-      totalCalendarDays:
-        Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1,
-      totalActiveDays: activeDaysNeeded,
+      chaptersPerDay:       cpd,
+      minutesPerDay:        parseFloat(input.minutesPerDay.toFixed(1)),
+      totalChapters:        total,
+      totalReadingMinutes:  parseFloat((total * avg).toFixed(1)),
+      estimatedEndDate:     toIsoDate(endDate),
+      totalCalendarDays:    Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1,
+      totalActiveDays:      activeDaysNeeded,
       warnings,
-      isAggressive: cpd > AGGRESSIVE_CHAPTERS_THRESHOLD,
-      isVeryAggressive: cpd > 20,
-      mode: "time",
-      startDate: input.startDate,
-      targetDate: null,
-      skipWeekdays: input.skipWeekdays,
+      isAggressive:         cpd > AGGRESSIVE_CHAPTERS_THRESHOLD,
+      isVeryAggressive:     cpd > 20,
+      mode:                 'time',
+      startDate:            input.startDate,
+      targetDate:           null,
+      skipWeekdays:         input.skipWeekdays,
       avgMinutesPerChapter: avg,
     };
   }
@@ -259,29 +264,39 @@ export class PlanCalculator {
   // ──────────────────────────────────────────
 
   static byDeadline(input: DeadlineModeInput): PlanCalculationResult {
-    const avg = input.avgMinutesPerChapter ?? DEFAULT_MINUTES_PER_CHAPTER;
+    const avg   = input.avgMinutesPerChapter ?? DEFAULT_MINUTES_PER_CHAPTER;
     const total = PlanCalculator.validateScope(input.bookSlugs);
     PlanCalculator.validateActiveDays(input.skipWeekdays);
 
-    const startDate = parseIsoDate(input.startDate);
+    const startDate  = parseIsoDate(input.startDate);
     const targetDate = parseIsoDate(input.targetDate);
+
+    // FIX CENTRAL DO BUG: parseIsoDate(undefined) NÃO lança erro — produz
+    // um "Invalid Date" silenciosamente (undefined + 'T00:00:00.000Z' vira
+    // a string "undefinedT00:00:00.000Z", que o construtor Date() aceita
+    // como inválida sem travar). Toda a matemática de data que vem depois
+    // (countActiveDays, divisões) silenciosamente retorna NaN, e como
+    // "NaN > MAX_CHAPTERS_PER_DAY" é sempre false, a verificação de
+    // PACE_EXCEEDS_MAX nunca disparava — o resultado "passava" cheio de NaN.
+    if (isNaN(startDate.getTime()) || isNaN(targetDate.getTime())) {
+      throw new PlanCalculationError(
+        'INVALID_INPUT',
+        `Data de início ou data-alvo inválida (startDate: "${input.startDate}", targetDate: "${input.targetDate}").`,
+      );
+    }
 
     if (targetDate <= startDate) {
       throw new PlanCalculationError(
-        "DEADLINE_IN_PAST",
+        'DEADLINE_IN_PAST',
         `A data-alvo (${input.targetDate}) deve ser posterior à data de início (${input.startDate}).`,
       );
     }
 
-    const activeDaysAvailable = countActiveDays(
-      startDate,
-      targetDate,
-      input.skipWeekdays,
-    );
+    const activeDaysAvailable = countActiveDays(startDate, targetDate, input.skipWeekdays);
     if (activeDaysAvailable === 0) {
       throw new PlanCalculationError(
-        "NO_ACTIVE_DAYS",
-        "Nenhum dia ativo disponível no período selecionado com os dias de descanso configurados.",
+        'NO_ACTIVE_DAYS',
+        'Nenhum dia ativo disponível no período selecionado com os dias de descanso configurados.',
       );
     }
 
@@ -289,35 +304,33 @@ export class PlanCalculator {
 
     if (cpd > MAX_CHAPTERS_PER_DAY) {
       throw new PlanCalculationError(
-        "PACE_EXCEEDS_MAX",
+        'PACE_EXCEEDS_MAX',
         `O prazo exige ${cpd} capítulos/dia, acima do máximo suportado (${MAX_CHAPTERS_PER_DAY}). ` +
-          `Amplie o prazo ou reduza o escopo de leitura.`,
+        `Amplie o prazo ou reduza o escopo de leitura.`,
       );
     }
 
     const warnings: PlanWarning[] = [];
-    const calendarDays =
-      Math.round((targetDate.getTime() - startDate.getTime()) / 86_400_000) + 1;
-    if (calendarDays < 7) warnings.push("deadline_very_soon");
-    if (cpd > 20) warnings.push("very_aggressive_pace");
-    else if (cpd > AGGRESSIVE_CHAPTERS_THRESHOLD)
-      warnings.push("aggressive_pace");
+    const calendarDays = Math.round((targetDate.getTime() - startDate.getTime()) / 86_400_000) + 1;
+    if (calendarDays < 7) warnings.push('deadline_very_soon');
+    if (cpd > 20)         warnings.push('very_aggressive_pace');
+    else if (cpd > AGGRESSIVE_CHAPTERS_THRESHOLD) warnings.push('aggressive_pace');
 
     return {
-      chaptersPerDay: cpd,
-      minutesPerDay: parseFloat((cpd * avg).toFixed(1)),
-      totalChapters: total,
-      totalReadingMinutes: parseFloat((total * avg).toFixed(1)),
-      estimatedEndDate: input.targetDate,
-      totalCalendarDays: calendarDays,
-      totalActiveDays: activeDaysAvailable,
+      chaptersPerDay:       cpd,
+      minutesPerDay:        parseFloat((cpd * avg).toFixed(1)),
+      totalChapters:        total,
+      totalReadingMinutes:  parseFloat((total * avg).toFixed(1)),
+      estimatedEndDate:     input.targetDate,
+      totalCalendarDays:    calendarDays,
+      totalActiveDays:      activeDaysAvailable,
       warnings,
-      isAggressive: cpd > AGGRESSIVE_CHAPTERS_THRESHOLD,
-      isVeryAggressive: cpd > 20,
-      mode: "deadline",
-      startDate: input.startDate,
-      targetDate: input.targetDate,
-      skipWeekdays: input.skipWeekdays,
+      isAggressive:         cpd > AGGRESSIVE_CHAPTERS_THRESHOLD,
+      isVeryAggressive:     cpd > 20,
+      mode:                 'deadline',
+      startDate:            input.startDate,
+      targetDate:           input.targetDate,
+      skipWeekdays:         input.skipWeekdays,
       avgMinutesPerChapter: avg,
     };
   }
@@ -329,15 +342,15 @@ export class PlanCalculator {
   private static validateScope(bookSlugs: readonly string[]): number {
     if (bookSlugs.length === 0) {
       throw new PlanCalculationError(
-        "EMPTY_SCOPE",
-        "Nenhum livro foi selecionado para o plano.",
+        'EMPTY_SCOPE',
+        'Nenhum livro foi selecionado para o plano.',
       );
     }
     const total = sumChapters(bookSlugs);
     if (total === 0) {
       throw new PlanCalculationError(
-        "ZERO_CHAPTERS",
-        "O escopo selecionado não contém capítulos válidos.",
+        'ZERO_CHAPTERS',
+        'O escopo selecionado não contém capítulos válidos.',
       );
     }
     return total;
@@ -346,8 +359,8 @@ export class PlanCalculator {
   private static validateActiveDays(skipWeekdays: readonly number[]): void {
     if (new Set(skipWeekdays).size >= 7) {
       throw new PlanCalculationError(
-        "NO_ACTIVE_DAYS",
-        "Todos os dias da semana estão marcados como descanso. Pelo menos um dia deve ser ativo.",
+        'NO_ACTIVE_DAYS',
+        'Todos os dias da semana estão marcados como descanso. Pelo menos um dia deve ser ativo.',
       );
     }
   }
@@ -361,9 +374,7 @@ export class PlanCalculator {
    * no formulário de criação enquanto o usuário digita.
    * Retorna null se os inputs forem inválidos.
    */
-  static preview(
-    input: Partial<PlanInput>,
-  ): Partial<PlanCalculationResult> | null {
+  static preview(input: Partial<PlanInput>): Partial<PlanCalculationResult> | null {
     try {
       if (!input.mode || !input.bookSlugs || !input.startDate) return null;
       return PlanCalculator.calculate(input as PlanInput);
@@ -377,13 +388,11 @@ export class PlanCalculator {
    */
   static warningLabel(warning: PlanWarning): string {
     const labels: Record<PlanWarning, string> = {
-      time_below_minimum: "Tempo diário muito baixo para uma leitura completa.",
-      adjusted_to_one_chapter:
-        "Tempo ajustado para o mínimo de 1 capítulo por dia.",
-      aggressive_pace:
-        "Ritmo acelerado. Exige comprometimento diário consistente.",
-      very_aggressive_pace: "Ritmo muito intenso. Avalie ampliar o prazo.",
-      deadline_very_soon: "Prazo em menos de 7 dias.",
+      time_below_minimum:      'Tempo diário muito baixo para uma leitura completa.',
+      adjusted_to_one_chapter: 'Tempo ajustado para o mínimo de 1 capítulo por dia.',
+      aggressive_pace:         'Ritmo acelerado. Exige comprometimento diário consistente.',
+      very_aggressive_pace:    'Ritmo muito intenso. Avalie ampliar o prazo.',
+      deadline_very_soon:      'Prazo em menos de 7 dias.',
     };
     return labels[warning] ?? warning;
   }
