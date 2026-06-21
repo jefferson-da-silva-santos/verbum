@@ -1,32 +1,20 @@
 /**
- * VERBUM — src/database/repositories/UserRepository.ts  [FIX DEFINITIVO]
+ * VERBUM — src/database/repositories/UserRepository.ts  [DIAGNÓSTICO]
  *
- * Causa raiz do erro de cadastro:
- *   O AuthContext.register() já chama userRepo.create() passando o
- *   CreateUserInput COMPLETO (name, email, avatarUrl, preferredVersion,
- *   avgReadingSpeed, fontScale, darkModePreference, notificationsEnabled,
- *   reminderTime) — usando `satisfies CreateUserInput`.
+ * Idêntico ao UserRepository.ts anterior, EXCETO pelo método create(),
+ * que agora valida cada parâmetro antes de enviar ao SQLite.
  *
- *   Mas o UserRepository.create() estava tipado para aceitar apenas
- *   { name, email } — incompatibilidade de contrato que gerava o erro
- *   de tipo no TypeScript E, em runtime, fazia o método ignorar/perder
- *   campos, deixando notificationsEnabled como boolean solto indo
- *   direto pro SQLite.
+ * Por quê: refazendo as contas com o AuthContext.tsx e types.ts que
+ * você mandou, todo parâmetro já deveria ser primitivo — o que sugere
+ * que o crash "[object Object]" veio de um BUILD desatualizado, não
+ * deste código. Mas para não continuar adivinhando às cegas, esta
+ * versão lança um erro NOMEANDO o campo exato se algo não-primitivo
+ * passar — assim, se o erro persistir mesmo num build limpo, a
+ * próxima mensagem de erro vai dizer precisamente qual campo é.
  *
- * Por que afeta Android E iOS:
- *   Hermes é o motor JS padrão em builds de produção do EAS nas DUAS
- *   plataformas desde o SDK 50+. A ponte JSI entre Hermes e o módulo
- *   nativo do SQLite não aceita booleans brutos como parâmetro de bind
- *   — isso é uma restrição do bridge, não do sistema operacional.
- *
- * Correções aplicadas:
- *   1. create() agora aceita o CreateUserInput completo.
- *   2. notificationsEnabled é convertido via this.boolToInt() ANTES
- *      de chegar no runAsync — nunca um boolean puro no array de params.
- *   3. avatar_url incluído no INSERT.
- *   4. update() retorna Promise<User> (re-fetch após o UPDATE),
- *      compatível com o AuthContext que faz
- *      `const updated = await userRepo.update(...); dispatch(...)`.
+ * Depois de confirmar que o cadastro funciona, pode voltar para a
+ * versão sem a validação (ela tem um custo mínimo de performance,
+ * irrelevante aqui, mas é só por organização de código).
  */
 
 import { BaseRepository } from './BaseRepository';
@@ -51,6 +39,10 @@ interface UserRow {
   updated_at:            string;
 }
 
+// Tipos aceitos como parâmetro de bind do SQLite — qualquer outra
+// coisa (objeto, array, função, Date não-convertida) é erro de uso.
+type SqlPrimitive = string | number | null;
+
 export class UserRepository extends BaseRepository {
   protected readonly name = 'UserRepository';
 
@@ -73,6 +65,37 @@ export class UserRepository extends BaseRepository {
     };
   }
 
+  // ── Validação diagnóstica ────────────────────────────────────
+
+  /**
+   * Confere que cada valor do array de bind é string | number | null.
+   * Se algum não for, lança um erro nomeando o campo e mostrando o
+   * valor recebido — substitui o "[object Object]" genérico do Kotlin
+   * por algo que aponta a causa exata.
+   */
+  private assertPrimitiveParams(named: Record<string, unknown>): SqlPrimitive[] {
+    const out: SqlPrimitive[] = [];
+    for (const [fieldName, value] of Object.entries(named)) {
+      const isPrimitive =
+        value === null ||
+        typeof value === 'string' ||
+        typeof value === 'number';
+
+      if (!isPrimitive) {
+        const typeDesc = Array.isArray(value) ? 'array' : typeof value;
+        let preview: string;
+        try { preview = JSON.stringify(value); } catch { preview = String(value); }
+        throw new Error(
+          `Campo "${fieldName}" não é primitivo válido para o SQLite ` +
+          `(tipo: ${typeDesc}, valor: ${preview}). ` +
+          `Eperado string | number | null.`,
+        );
+      }
+      out.push(value as SqlPrimitive);
+    }
+    return out;
+  }
+
   // ── CREATE ───────────────────────────────────────────────────
 
   async create(input: CreateUserInput): Promise<User> {
@@ -80,8 +103,23 @@ export class UserRepository extends BaseRepository {
       const id = this.generateId();
       const ts = this.now();
 
-      // Todos os valores são primitivos seguros para SQLite:
-      // string | number | null — NUNCA boolean direto.
+      // Cada campo nomeado — se algum vier como objeto/array/etc,
+      // assertPrimitiveParams lança um erro apontando QUAL campo é.
+      const params = this.assertPrimitiveParams({
+        id,
+        name:                 input.name.trim(),
+        email:                input.email.trim().toLowerCase(),
+        avatarUrl:            input.avatarUrl ?? null,
+        preferredVersion:     input.preferredVersion ?? 'acf',
+        avgReadingSpeed:      input.avgReadingSpeed ?? 3.7,
+        fontScale:            input.fontScale ?? 1.0,
+        darkModePreference:   input.darkModePreference ?? 'system',
+        notificationsEnabled: this.boolToInt(input.notificationsEnabled ?? true),
+        reminderTime:         input.reminderTime ?? null,
+        createdAt:            ts,
+        updatedAt:            ts,
+      });
+
       await this.db.runAsync(
         `INSERT INTO users (
           id, name, email, avatar_url,
@@ -89,20 +127,7 @@ export class UserRepository extends BaseRepository {
           dark_mode_preference, notifications_enabled,
           reminder_time, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          id,
-          input.name.trim(),
-          input.email.trim().toLowerCase(),
-          input.avatarUrl ?? null,
-          input.preferredVersion ?? 'acf',
-          input.avgReadingSpeed ?? 3.7,
-          input.fontScale ?? 1.0,
-          input.darkModePreference ?? 'system',
-          this.boolToInt(input.notificationsEnabled ?? true),  // ← fix central
-          input.reminderTime ?? null,
-          ts,
-          ts,
-        ],
+        params,
       );
 
       const user = await this.findById(id);
@@ -167,7 +192,7 @@ export class UserRepository extends BaseRepository {
       if (data.darkModePreference   !== undefined) { fields.push('dark_mode_preference = ?');  values.push(data.darkModePreference); }
       if (data.notificationsEnabled !== undefined) {
         fields.push('notifications_enabled = ?');
-        values.push(this.boolToInt(data.notificationsEnabled));   // ← fix central também aqui
+        values.push(this.boolToInt(data.notificationsEnabled));
       }
       if (data.reminderTime !== undefined) { fields.push('reminder_time = ?'); values.push(data.reminderTime ?? null); }
 
@@ -182,7 +207,6 @@ export class UserRepository extends BaseRepository {
         );
       }
 
-      // AuthContext espera o User atualizado de volta, não void
       const updated = await this.findById(id);
       if (!updated) throw new Error('Usuário não encontrado após UPDATE.');
       return updated;

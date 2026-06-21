@@ -19,7 +19,8 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Verbum não utiliza câmera.",
-        "NSPhotoLibraryUsageDescription": "Para salvar imagens exportadas."
+        "NSPhotoLibraryUsageDescription": "Para salvar imagens exportadas.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

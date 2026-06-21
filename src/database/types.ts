@@ -204,7 +204,19 @@ export interface ApiCacheEntry {
 // Omitem campos gerados automaticamente (id, timestamps)
 // ─────────────────────────────────────────────
 
-export type CreateUserInput = Omit<User, "id" | "createdAt" | "updatedAt">;
+ export type CreateUserInput = Pick<User, "name" | "email"> &
+    Partial<
+      Pick<
+        User,
+        | "avatarUrl"
+        | "preferredVersion"
+        | "avgReadingSpeed"
+        | "fontScale"
+        | "darkModePreference"
+        | "notificationsEnabled"
+        | "reminderTime"
+      >
+    >;
 
 export type UpdateUserInput = Partial<
   Pick<
