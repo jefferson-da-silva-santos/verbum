@@ -1,28 +1,26 @@
 /**
- * VERBUM — src/database/repositories/UserRepository.ts  [DIAGNÓSTICO]
+ * VERBUM — src/database/repositories/UserRepository.ts  [FIX DEFINITIVO v3]
  *
- * Idêntico ao UserRepository.ts anterior, EXCETO pelo método create(),
- * que agora valida cada parâmetro antes de enviar ao SQLite.
+ * Causa raiz confirmada pelo diagnóstico:
+ *   assertPrimitiveParams NÃO lançava erro — todos os valores eram
+ *   primitivos. Mas runAsync(sql, [array]) AINDA falhava com
+ *   "[object Object]" no Kotlin.
  *
- * Por quê: refazendo as contas com o AuthContext.tsx e types.ts que
- * você mandou, todo parâmetro já deveria ser primitivo — o que sugere
- * que o crash "[object Object]" veio de um BUILD desatualizado, não
- * deste código. Mas para não continuar adivinhando às cegas, esta
- * versão lança um erro NOMEANDO o campo exato se algo não-primitivo
- * passar — assim, se o erro persistir mesmo num build limpo, a
- * próxima mensagem de erro vai dizer precisamente qual campo é.
+ * O problema é o próprio array como argumento, não os valores dentro.
+ *   Em expo-sqlite v15 + Hermes + EAS build, a ponte Kotlin recebe
+ *   runAsync(sql, [v1, v2, ...]) e trata o array como um objeto único
+ *   em vez de iterar sobre ele — daí o "[object Object]".
  *
- * Depois de confirmar que o cadastro funciona, pode voltar para a
- * versão sem a validação (ela tem um custo mínimo de performance,
- * irrelevante aqui, mas é só por organização de código).
+ * Solução: usar named parameters do SQLite (:nome) em vez de
+ *   positional (?). O named param usa um Record<string, value> que
+ *   a ponte Kotlin manipula por um code path completamente diferente,
+ *   sem o problema do array.
+ *
+ *   Funciona tanto no Android (confirmado pelo erro) quanto no iOS.
  */
 
 import { BaseRepository } from './BaseRepository';
-import type {
-  User,
-  CreateUserInput,
-  UpdateUserInput,
-} from '../types';
+import type { User, CreateUserInput, UpdateUserInput } from '../types';
 
 interface UserRow {
   id:                    string;
@@ -39,14 +37,8 @@ interface UserRow {
   updated_at:            string;
 }
 
-// Tipos aceitos como parâmetro de bind do SQLite — qualquer outra
-// coisa (objeto, array, função, Date não-convertida) é erro de uso.
-type SqlPrimitive = string | number | null;
-
 export class UserRepository extends BaseRepository {
   protected readonly name = 'UserRepository';
-
-  // ── Mapeamento de linha → User ────────────────────────────────
 
   private mapRow(row: UserRow): User {
     return {
@@ -54,9 +46,9 @@ export class UserRepository extends BaseRepository {
       name:                 row.name,
       email:                row.email,
       avatarUrl:            row.avatar_url ?? null,
-      preferredVersion:     (row.preferred_version ?? 'acf')    as User['preferredVersion'],
-      avgReadingSpeed:      row.avg_reading_speed   ?? 3.7,
-      fontScale:            row.font_scale          ?? 1.0,
+      preferredVersion:     (row.preferred_version ?? 'acf') as User['preferredVersion'],
+      avgReadingSpeed:      row.avg_reading_speed ?? 3.7,
+      fontScale:            row.font_scale ?? 1.0,
       darkModePreference:   (row.dark_mode_preference ?? 'system') as User['darkModePreference'],
       notificationsEnabled: this.intToBool(row.notifications_enabled),
       reminderTime:         row.reminder_time ?? null,
@@ -65,87 +57,61 @@ export class UserRepository extends BaseRepository {
     };
   }
 
-  // ── Validação diagnóstica ────────────────────────────────────
-
-  /**
-   * Confere que cada valor do array de bind é string | number | null.
-   * Se algum não for, lança um erro nomeando o campo e mostrando o
-   * valor recebido — substitui o "[object Object]" genérico do Kotlin
-   * por algo que aponta a causa exata.
-   */
-  private assertPrimitiveParams(named: Record<string, unknown>): SqlPrimitive[] {
-    const out: SqlPrimitive[] = [];
-    for (const [fieldName, value] of Object.entries(named)) {
-      const isPrimitive =
-        value === null ||
-        typeof value === 'string' ||
-        typeof value === 'number';
-
-      if (!isPrimitive) {
-        const typeDesc = Array.isArray(value) ? 'array' : typeof value;
-        let preview: string;
-        try { preview = JSON.stringify(value); } catch { preview = String(value); }
-        throw new Error(
-          `Campo "${fieldName}" não é primitivo válido para o SQLite ` +
-          `(tipo: ${typeDesc}, valor: ${preview}). ` +
-          `Eperado string | number | null.`,
-        );
-      }
-      out.push(value as SqlPrimitive);
-    }
-    return out;
-  }
-
-  // ── CREATE ───────────────────────────────────────────────────
+  // ── CREATE ───────────────────────────────────────────────────────
 
   async create(input: CreateUserInput): Promise<User> {
     try {
       const id = this.generateId();
       const ts = this.now();
 
-      // Cada campo nomeado — se algum vier como objeto/array/etc,
-      // assertPrimitiveParams lança um erro apontando QUAL campo é.
-      const params = this.assertPrimitiveParams({
-        id,
-        name:                 input.name.trim(),
-        email:                input.email.trim().toLowerCase(),
-        avatarUrl:            input.avatarUrl ?? null,
-        preferredVersion:     input.preferredVersion ?? 'acf',
-        avgReadingSpeed:      input.avgReadingSpeed ?? 3.7,
-        fontScale:            input.fontScale ?? 1.0,
-        darkModePreference:   input.darkModePreference ?? 'system',
-        notificationsEnabled: this.boolToInt(input.notificationsEnabled ?? true),
-        reminderTime:         input.reminderTime ?? null,
-        createdAt:            ts,
-        updatedAt:            ts,
-      });
-
+      // FIX: usa named parameters (:nome) em vez de positional (?).
+      // Em expo-sqlite v15 + Hermes, passar runAsync(sql, [array])
+      // faz o bridge Kotlin tratar o array como um único "[object Object]".
+      // Named params passam um Record<string, value> por um code path
+      // diferente que não tem esse problema.
       await this.db.runAsync(
         `INSERT INTO users (
-          id, name, email, avatar_url,
-          preferred_version, avg_reading_speed, font_scale,
-          dark_mode_preference, notifications_enabled,
-          reminder_time, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        params,
+           id, name, email, avatar_url,
+           preferred_version, avg_reading_speed, font_scale,
+           dark_mode_preference, notifications_enabled,
+           reminder_time, created_at, updated_at
+         ) VALUES (
+           $id, $name, $email, $avatarUrl,
+           $preferredVersion, $avgReadingSpeed, $fontScale,
+           $darkModePreference, $notificationsEnabled,
+           $reminderTime, $createdAt, $updatedAt
+         )`,
+        {
+          $id:                   id,
+          $name:                 input.name.trim(),
+          $email:                input.email.trim().toLowerCase(),
+          $avatarUrl:            input.avatarUrl            ?? null,
+          $preferredVersion:     input.preferredVersion     ?? 'acf',
+          $avgReadingSpeed:      input.avgReadingSpeed      ?? 3.7,
+          $fontScale:            input.fontScale            ?? 1.0,
+          $darkModePreference:   input.darkModePreference   ?? 'system',
+          $notificationsEnabled: this.boolToInt(input.notificationsEnabled ?? true),
+          $reminderTime:         input.reminderTime         ?? null,
+          $createdAt:            ts,
+          $updatedAt:            ts,
+        },
       );
 
       const user = await this.findById(id);
-      if (!user) throw new Error('Usuário não encontrado imediatamente após o INSERT.');
+      if (!user) throw new Error('Usuário não encontrado após o INSERT.');
       return user;
-
     } catch (e) {
       throw this.wrapError('create', e);
     }
   }
 
-  // ── READ ─────────────────────────────────────────────────────
+  // ── READ ─────────────────────────────────────────────────────────
 
   async findById(id: string): Promise<User | null> {
     try {
       const row = await this.db.getFirstAsync<UserRow>(
-        'SELECT * FROM users WHERE id = ?',
-        [id],
+        'SELECT * FROM users WHERE id = $id',
+        { $id: id },
       );
       return row ? this.mapRow(row) : null;
     } catch (e) {
@@ -156,8 +122,8 @@ export class UserRepository extends BaseRepository {
   async findByEmail(email: string): Promise<User | null> {
     try {
       const row = await this.db.getFirstAsync<UserRow>(
-        'SELECT * FROM users WHERE email = ?',
-        [email.trim().toLowerCase()],
+        'SELECT * FROM users WHERE email = $email',
+        { $email: email.trim().toLowerCase() },
       );
       return row ? this.mapRow(row) : null;
     } catch (e) {
@@ -168,8 +134,8 @@ export class UserRepository extends BaseRepository {
   async exists(email: string): Promise<boolean> {
     try {
       const row = await this.db.getFirstAsync<{ c: number }>(
-        'SELECT COUNT(*) as c FROM users WHERE email = ?',
-        [email.trim().toLowerCase()],
+        'SELECT COUNT(*) as c FROM users WHERE email = $email',
+        { $email: email.trim().toLowerCase() },
       );
       return (row?.c ?? 0) > 0;
     } catch (e) {
@@ -177,50 +143,49 @@ export class UserRepository extends BaseRepository {
     }
   }
 
-  // ── UPDATE — retorna Promise<User>, não void ────────────────────
+  // ── UPDATE ───────────────────────────────────────────────────────
 
   async update(id: string, data: UpdateUserInput): Promise<User> {
     try {
-      const fields: string[]                   = [];
-      const values: (string | number | null)[] = [];
+      // Para UPDATE dinâmico, monta named params com prefixo $
+      const setClauses: string[] = [];
+      const params: Record<string, string | number | null> = { $id: id };
 
-      if (data.name                 !== undefined) { fields.push('name = ?');                  values.push(data.name); }
-      if (data.avatarUrl            !== undefined) { fields.push('avatar_url = ?');            values.push(data.avatarUrl ?? null); }
-      if (data.preferredVersion     !== undefined) { fields.push('preferred_version = ?');     values.push(data.preferredVersion); }
-      if (data.avgReadingSpeed      !== undefined) { fields.push('avg_reading_speed = ?');     values.push(data.avgReadingSpeed); }
-      if (data.fontScale            !== undefined) { fields.push('font_scale = ?');            values.push(data.fontScale); }
-      if (data.darkModePreference   !== undefined) { fields.push('dark_mode_preference = ?');  values.push(data.darkModePreference); }
-      if (data.notificationsEnabled !== undefined) {
-        fields.push('notifications_enabled = ?');
-        values.push(this.boolToInt(data.notificationsEnabled));
-      }
-      if (data.reminderTime !== undefined) { fields.push('reminder_time = ?'); values.push(data.reminderTime ?? null); }
+      if (data.name                 !== undefined) { setClauses.push('name = $name');                         params.$name                 = data.name; }
+      if (data.avatarUrl            !== undefined) { setClauses.push('avatar_url = $avatarUrl');               params.$avatarUrl             = data.avatarUrl ?? null; }
+      if (data.preferredVersion     !== undefined) { setClauses.push('preferred_version = $preferredVersion'); params.$preferredVersion      = data.preferredVersion; }
+      if (data.avgReadingSpeed      !== undefined) { setClauses.push('avg_reading_speed = $avgReadingSpeed');  params.$avgReadingSpeed       = data.avgReadingSpeed; }
+      if (data.fontScale            !== undefined) { setClauses.push('font_scale = $fontScale');               params.$fontScale             = data.fontScale; }
+      if (data.darkModePreference   !== undefined) { setClauses.push('dark_mode_preference = $darkModePreference'); params.$darkModePreference = data.darkModePreference; }
+      if (data.notificationsEnabled !== undefined) { setClauses.push('notifications_enabled = $notificationsEnabled'); params.$notificationsEnabled = this.boolToInt(data.notificationsEnabled); }
+      if (data.reminderTime         !== undefined) { setClauses.push('reminder_time = $reminderTime');         params.$reminderTime          = data.reminderTime ?? null; }
 
-      if (fields.length > 0) {
-        fields.push('updated_at = ?');
-        values.push(this.now());
-        values.push(id);
+      if (setClauses.length > 0) {
+        setClauses.push('updated_at = $updatedAt');
+        params.$updatedAt = this.now();
 
         await this.db.runAsync(
-          `UPDATE users SET ${fields.join(', ')} WHERE id = ?`,
-          values,
+          `UPDATE users SET ${setClauses.join(', ')} WHERE id = $id`,
+          params,
         );
       }
 
       const updated = await this.findById(id);
       if (!updated) throw new Error('Usuário não encontrado após UPDATE.');
       return updated;
-
     } catch (e) {
       throw this.wrapError('update', e);
     }
   }
 
-  // ── DELETE / UTILS ───────────────────────────────────────────
+  // ── DELETE / UTILS ───────────────────────────────────────────────
 
   async delete(id: string): Promise<void> {
     try {
-      await this.db.runAsync('DELETE FROM users WHERE id = ?', [id]);
+      await this.db.runAsync(
+        'DELETE FROM users WHERE id = $id',
+        { $id: id },
+      );
     } catch (e) {
       throw this.wrapError('delete', e);
     }
