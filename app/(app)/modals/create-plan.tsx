@@ -1,63 +1,76 @@
 /**
  * VERBUM — Modal: CreatePlan (Wizard de 3 passos)
+ *
+ * FIXES acumulados nesta versão:
+ *   1. handleCreate usa union discriminada por modo (TypeScript)
+ *   2. targetDate sempre string (nunca undefined) — fix do type error
+ *   3. SafeAreaView de 'react-native-safe-area-context' + useSafeAreaInsets
+ *      → conteúdo não invade a barra de tarefas do Android
+ *   4. safeNum() para nunca mostrar NaN na tela de confirmação
  */
 
 import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useTheme }      from '../../../src/context/ThemeContext';
+
+import { useTheme } from '../../../src/context/ThemeContext';
 import { useActivePlan } from '../../../src/hooks/useActivePlan';
-import { PRESET_PLANS }  from '../../../src/constants/presetPlans';
-import { BIBLE_BOOKS }   from '../../../src/constants/bible';
-import { Button }        from '../../../src/components/ui/Button';
+import { PRESET_PLANS } from '../../../src/constants/presetPlans';
+import { BIBLE_BOOKS } from '../../../src/constants/bible';
+import { Button } from '../../../src/components/ui/Button';
 import { PlanCalculator } from '../../../src/engine/PlanCalculator';
 import { todayIso, addDays, toIsoDate } from '../../../src/engine/dateHelpers';
 
 export default function CreatePlanModal() {
-  const { tokens }    = useTheme();
+  const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
   const { createPlan } = useActivePlan();
-  const { presetId }  = useLocalSearchParams<{ presetId?: string }>();
+  const { presetId } = useLocalSearchParams<{ presetId?: string }>();
 
-  const [step,     setStep]    = useState<1 | 2 | 3>(1);
-  const [preset,   setPreset]  = useState(presetId ?? '');
-  const [mode,     setMode]    = useState<'chapters' | 'time' | 'deadline'>('chapters');
-  const [cpd,      setCpd]     = useState(3);
-  // FIX: este estado não existia — modo "Por prazo" nunca tinha de onde
-  // tirar uma data-alvo, então o calculador recebia targetDate undefined.
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [preset, setPreset] = useState(presetId ?? '');
+  const [mode, setMode] = useState<'chapters' | 'time' | 'deadline'>('chapters');
+  const [cpd, setCpd] = useState(3);
   const [deadlineDays, setDeadlineDays] = useState(30);
-  const [loading,  setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const selectedPlan = PRESET_PLANS.find(p => p.id === preset);
-  const bookSlugs    = selectedPlan?.bookSlugs ?? BIBLE_BOOKS.map(b => b.slug);
+  const bookSlugs = selectedPlan?.bookSlugs ?? BIBLE_BOOKS.map(b => b.slug);
 
-  // Data-alvo só existe (e só faz sentido) no modo prazo
-  const targetDate = mode === 'deadline' ? toIsoDate(addDays(new Date(), deadlineDays)) : undefined;
+  // FIX 2: targetDate sempre string — nunca undefined.
+  // string | undefined causa erro de tipo em PlanInput (union discriminada).
+  const targetDate: string = toIsoDate(addDays(new Date(), deadlineDays));
 
   const preview = PlanCalculator.preview({
     mode,
     bookSlugs,
-    startDate:    todayIso(),
+    startDate: todayIso(),
     skipWeekdays: [],
     chaptersPerDay: mode === 'chapters' ? cpd : undefined,
-    minutesPerDay:  mode === 'time'     ? cpd * 3.7 : undefined,
-    targetDate,   // ← FIX: antes nunca era enviado
+    minutesPerDay: mode === 'time' ? cpd * 3.7 : undefined,
+    targetDate,
   });
 
-  // Rede de segurança extra: mesmo que algum cálculo futuro falhe,
-  // a tela nunca deve literalmente mostrar "NaN" para o usuário.
-  // (?? não pega NaN, já que NaN não é null/undefined — por isso o
-  // bug aparecia mesmo com o "?? cpd" já presente no código.)
+  // FIX 4: safeNum — ?? não pega NaN (NaN não é null/undefined)
   const safeNum = (n: number | undefined, fallback: number): number =>
     typeof n === 'number' && Number.isFinite(n) ? n : fallback;
 
+  // FIX 1: union discriminada — cada branch tem mode como literal exato
+  // para o TypeScript conseguir estreitar o tipo corretamente.
   const handleCreate = async () => {
     setLoading(true);
     try {
-      await createPlan(
-        { mode, bookSlugs, startDate: todayIso(), skipWeekdays: [], chaptersPerDay: cpd, targetDate },
-        selectedPlan?.name ?? 'Meu Plano',
-      );
+      const base = { bookSlugs, startDate: todayIso(), skipWeekdays: [] as number[], targetDate };
+
+      const planInput =
+        mode === 'chapters' ? { ...base, mode: 'chapters' as const, chaptersPerDay: cpd } :
+          mode === 'time' ? { ...base, mode: 'time' as const, minutesPerDay: cpd * 3.7 } :
+            { ...base, mode: 'deadline' as const };
+
+      await createPlan(planInput, selectedPlan?.name ?? 'Meu Plano');
       router.back();
     } catch (e) {
       console.error(e);
@@ -67,20 +80,26 @@ export default function CreatePlanModal() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: tokens.bgPrimary }}>
+    // FIX 3: SafeAreaView de 'react-native-safe-area-context' (não do 'react-native').
+    // O SafeAreaView nativo do Android não lida com a barra de navegação inferior.
+    // Usando edges explícitos para controlar exatamente quais lados são protegidos.
+    <SafeAreaView style={{ flex: 1, backgroundColor: tokens.bgPrimary }} edges={['top', 'bottom']}>
+
       {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: tokens.borderLight }}>
-        <TouchableOpacity onPress={() => step > 1 ? setStep(s => (s - 1) as 1|2|3) : router.back()}>
+        <TouchableOpacity onPress={() => step > 1 ? setStep(s => (s - 1) as 1 | 2 | 3) : router.back()}>
           <MaterialCommunityIcons name={step > 1 ? 'arrow-left' : 'close'} size={22} color={tokens.iconPrimary} />
         </TouchableOpacity>
         <Text style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: tokens.textPrimary }}>
           Criar Plano · Passo {step}/3
         </Text>
         <View style={{ width: 22 }} />
-        
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
+      <ScrollView
+        contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: insets.bottom + 24 }}
+        keyboardShouldPersistTaps="handled"
+      >
 
         {/* PASSO 1 — Escopo */}
         {step === 1 && (
@@ -141,15 +160,12 @@ export default function CreatePlanModal() {
                 </Text>
                 <Text style={{ fontSize: 12, color: mode === m ? tokens.actionPrimaryText : tokens.textTertiary, opacity: 0.8 }}>
                   {m === 'chapters' ? 'Ex: 3 capítulos/dia → calcula a data' :
-                   m === 'time'     ? 'Ex: 20 min/dia → calcula caps e data' :
-                   'Defina quando quer terminar'}
+                    m === 'time' ? 'Ex: 20 min/dia → calcula caps e data' :
+                      'Defina quando quer terminar'}
                 </Text>
               </TouchableOpacity>
             ))}
 
-            {/* FIX: antes havia só ESTE stepper de cpd para os 3 modos —
-                no modo "Por prazo" ele não tinha utilidade nenhuma, e o
-                calculador nunca recebia uma data-alvo de verdade. */}
             {mode === 'deadline' ? (
               <View style={{ gap: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: tokens.bgCard, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: tokens.borderLight }}>
@@ -191,8 +207,8 @@ export default function CreatePlanModal() {
               Confirmar plano
             </Text>
             <View style={{ backgroundColor: tokens.bgCard, borderRadius: 12, padding: 20, borderWidth: 1, borderColor: tokens.borderLight, gap: 12 }}>
-              <Row label="Escopo"          value={selectedPlan?.name ?? '—'} />
-              <Row label="Capítulos/dia"   value={String(safeNum(preview?.chaptersPerDay, cpd))} />
+              <Row label="Escopo" value={selectedPlan?.name ?? '—'} />
+              <Row label="Capítulos/dia" value={String(safeNum(preview?.chaptersPerDay, cpd))} />
               <Row label="Tempo estimado/dia" value={`~${Math.round(safeNum(preview?.minutesPerDay, cpd * 3.7))} min`} />
               <Row label="Total de capítulos" value={String(preview?.totalChapters ?? '—')} />
               <Row label="Conclusão estimada" value={preview?.estimatedEndDate ?? targetDate ?? '—'} />

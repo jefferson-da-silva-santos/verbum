@@ -1,10 +1,6 @@
 /**
- * VERBUM — DiaryRepository
- *
- * Diário espiritual — espaço isolado para reflexões pessoais.
- * Intencionalmente desvinculado da estrutura técnica de capítulos/versículos.
+ * VERBUM — DiaryRepository [named params fix]
  */
-
 import { BaseRepository } from "./BaseRepository";
 import type {
   DiaryEntry,
@@ -44,19 +40,17 @@ export class DiaryRepository extends BaseRepository {
       const id = this.generateId();
       const now = this.now();
       await this.db.runAsync(
-        `INSERT INTO diary_entries
-          (id, user_id, title, content, mood, entry_date, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          id,
-          input.userId,
-          input.title ?? null,
-          input.content,
-          input.mood ?? null,
-          input.entryDate,
-          now,
-          now,
-        ],
+        `INSERT INTO diary_entries (id, user_id, title, content, mood, entry_date, created_at, updated_at)
+         VALUES ($id, $userId, $title, $content, $mood, $entryDate, $now, $now)`,
+        {
+          $id: id,
+          $userId: input.userId,
+          $title: input.title ?? null,
+          $content: input.content,
+          $mood: input.mood ?? null,
+          $entryDate: input.entryDate,
+          $now: now,
+        },
       );
       return (await this.findById(id))!;
     } catch (e) {
@@ -67,8 +61,8 @@ export class DiaryRepository extends BaseRepository {
   async findById(id: string): Promise<DiaryEntry | null> {
     try {
       const row = await this.db.getFirstAsync<DiaryRow>(
-        "SELECT * FROM diary_entries WHERE id = ?",
-        [id],
+        `SELECT * FROM diary_entries WHERE id = $id`,
+        { $id: id },
       );
       return row ? this.mapRow(row) : null;
     } catch (e) {
@@ -83,8 +77,8 @@ export class DiaryRepository extends BaseRepository {
     try {
       const { limit = 30, offset = 0 } = opts;
       const rows = await this.db.getAllAsync<DiaryRow>(
-        "SELECT * FROM diary_entries WHERE user_id = ? ORDER BY entry_date DESC, created_at DESC LIMIT ? OFFSET ?",
-        [userId, limit, offset],
+        `SELECT * FROM diary_entries WHERE user_id = $userId ORDER BY entry_date DESC, created_at DESC LIMIT $limit OFFSET $offset`,
+        { $userId: userId, $limit: limit, $offset: offset },
       );
       return rows.map((r) => this.mapRow(r));
     } catch (e) {
@@ -95,8 +89,8 @@ export class DiaryRepository extends BaseRepository {
   async findByDate(userId: string, date: string): Promise<DiaryEntry[]> {
     try {
       const rows = await this.db.getAllAsync<DiaryRow>(
-        "SELECT * FROM diary_entries WHERE user_id = ? AND entry_date = ? ORDER BY created_at DESC",
-        [userId, date],
+        `SELECT * FROM diary_entries WHERE user_id = $userId AND entry_date = $date ORDER BY created_at DESC`,
+        { $userId: userId, $date: date },
       );
       return rows.map((r) => this.mapRow(r));
     } catch (e) {
@@ -107,14 +101,14 @@ export class DiaryRepository extends BaseRepository {
   async update(id: string, input: UpdateDiaryEntryInput): Promise<DiaryEntry> {
     try {
       await this.db.runAsync(
-        "UPDATE diary_entries SET title = ?, content = ?, mood = ?, updated_at = ? WHERE id = ?",
-        [
-          input.title ?? null,
-          input.content,
-          input.mood ?? null,
-          this.now(),
-          id,
-        ],
+        `UPDATE diary_entries SET title = $title, content = $content, mood = $mood, updated_at = $now WHERE id = $id`,
+        {
+          $title: input.title ?? null,
+          $content: input.content,
+          $mood: input.mood ?? null,
+          $now: this.now(),
+          $id: id,
+        },
       );
       return (await this.findById(id))!;
     } catch (e) {
@@ -124,7 +118,9 @@ export class DiaryRepository extends BaseRepository {
 
   async delete(id: string): Promise<void> {
     try {
-      await this.db.runAsync("DELETE FROM diary_entries WHERE id = ?", [id]);
+      await this.db.runAsync(`DELETE FROM diary_entries WHERE id = $id`, {
+        $id: id,
+      });
     } catch (e) {
       throw this.wrapError("delete", e);
     }
@@ -133,8 +129,8 @@ export class DiaryRepository extends BaseRepository {
   async count(userId: string): Promise<number> {
     try {
       const row = await this.db.getFirstAsync<{ c: number }>(
-        "SELECT COUNT(*) as c FROM diary_entries WHERE user_id = ?",
-        [userId],
+        `SELECT COUNT(*) as c FROM diary_entries WHERE user_id = $userId`,
+        { $userId: userId },
       );
       return row?.c ?? 0;
     } catch (e) {

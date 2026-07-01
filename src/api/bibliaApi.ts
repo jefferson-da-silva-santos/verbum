@@ -35,7 +35,7 @@ const SLUG_TO_ABBREV: Record<string, string> = {
   is:'is',jr:'jr',lm:'lm',ez:'ez',dn:'dn',
   os:'os',jl:'jl',am:'am',ob:'ob',jn:'jn',
   mq:'mq',na:'na',hc:'hc',sf:'sf',ag:'ag',zc:'zc',ml:'ml',
-  mt:'mt',mc:'mc',lc:'lc',jo:'jo',at:'at',rm:'rm',
+  mt:'mt',mc:'mc',lc:'lc',jo:'jo',at:'atos',rm:'rm',
   '1co':'1co','2co':'2co',gl:'gl',ef:'ef',fp:'fp',cl:'cl',
   '1ts':'1ts','2ts':'2ts','1tm':'1tm','2tm':'2tm',
   tt:'tt',fm:'fm',hb:'hb',tg:'tg',

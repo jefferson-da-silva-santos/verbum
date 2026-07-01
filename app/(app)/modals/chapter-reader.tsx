@@ -16,35 +16,35 @@
  *   - Adiciona null-checks em todos os pontos críticos
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StatusBar,
   ActivityIndicator, Alert, Share,
 } from 'react-native';
-import { useSafeAreaInsets }            from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { LinearGradient }               from 'expo-linear-gradient';
-import { MaterialCommunityIcons }       from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { useTheme }          from '../../../src/context/ThemeContext';
-import { useAuthContext }    from '../../../src/context/AuthContext';
-import { usePlanContext }    from '../../../src/context/PlanContext';   // ← FIX: usa o context completo
-import { useBibleChapter }  from '../../../src/hooks/useBibleChapter';
-import { VerseItem }        from '../../../src/components/bible/VerseItem';
+import { useTheme } from '../../../src/context/ThemeContext';
+import { useAuthContext } from '../../../src/context/AuthContext';
+import { usePlanContext } from '../../../src/context/PlanContext';   // ← FIX: usa o context completo
+import { useBibleChapter } from '../../../src/hooks/useBibleChapter';
+import { VerseItem } from '../../../src/components/bible/VerseItem';
 import { ChapterHeader, VerseActionSheet } from '../../../src/components/bible/ChapterHeader';
-import { findBook }         from '../../../src/constants/bible';
+import { findBook } from '../../../src/constants/bible';
 import { highlightRepo, favoriteRepo } from '../../../src/database/repositories';
 import { ThematicMapRepository } from '@/src/database/repositories/ThematicMapRepository';
-import type { Highlight }              from '../../../src/database/types';
-import type { HighlightColor }         from '../../../src/constants/bible';
-import { HIGHLIGHT_DEFINITIONS }       from '../../../src/constants/bible';
-import { AddToSermonSheet }            from '../../../src/components/sermon/AddToSermonSheet';
-import type { VerseToAdd }             from '../../../src/components/sermon/AddToSermonSheet';
+import type { Highlight } from '../../../src/database/types';
+import type { HighlightColor } from '../../../src/constants/bible';
+import { HIGHLIGHT_DEFINITIONS } from '../../../src/constants/bible';
+import { AddToSermonSheet } from '../../../src/components/sermon/AddToSermonSheet';
+import type { VerseToAdd } from '../../../src/components/sermon/AddToSermonSheet';
 
 export default function ChapterReaderModal() {
   const { tokens } = useTheme();
-  const insets     = useSafeAreaInsets();
-  const { user }   = useAuthContext();
+  const insets = useSafeAreaInsets();
+  const { user } = useAuthContext();
 
   // FIX: usePlanContext em vez de useActivePlan — tem readChapterIds e markChapterRead
   const { activePlan, markChapterRead, readChapterIds } = usePlanContext();
@@ -53,13 +53,13 @@ export default function ChapterReaderModal() {
     useLocalSearchParams<{ bookSlug: string; chapter: string }>();
 
   const chapterNum = parseInt(String(chapterParam), 10) || 1;
-  const book       = findBook(String(bookSlug));
+  const book = findBook(String(bookSlug));
 
   const { data, isLoading, error, isStale, reload } =
     useBibleChapter(String(bookSlug), chapterNum);
 
   const [highlights, setHighlights] = useState<Record<number, Highlight>>({});
-  const [selected,   setSelected]   = useState<{ number: number; text: string } | null>(null);
+  const [selected, setSelected] = useState<{ number: number; text: string } | null>(null);
   const [addToSermonVerse, setAddToSermonVerse] = useState<VerseToAdd | null>(null);
 
   // Progresso de leitura — barra fina sob a navbar, como Kindle/Medium
@@ -73,11 +73,31 @@ export default function ChapterReaderModal() {
 
   const chapterId = `${bookSlug}-${chapterNum}`;
 
-  // FIX: null-safe — readChapterIds pode ser Set vazio mas nunca undefined
-  const safeReadIds: ReadonlySet<string> = readChapterIds ?? new Set<string>();
-  const isRead = safeReadIds.has(chapterId);
+  // Verifica se o capítulo atual pertence ao escopo do plano ativo.
+  // O botão "Marcar como lido" só aparece quando:
+  //   - Há um plano ativo E o livro faz parte do escopo do plano
+  //   - OU não há plano ativo (leitura livre sem restrição de escopo)
+  const isInPlanScope = useMemo(() => {
+    if (!activePlan) return true; // sem plano = leitura livre, mostra o botão
+    const scope = (activePlan.scopeData as any);
+    if (!scope) return true;
+    // Bíblia inteira / preset / testamento = todos os livros contam
+    if (scope.type === 'full_bible' || scope.type === 'preset' || scope.type === 'testament') return true;
+    // Lista de livros específicos
+    if (scope.type === 'books') return (scope.bookSlugs as string[]).includes(String(bookSlug));
+    // Livro único
+    if (scope.type === 'book') return scope.bookSlug === String(bookSlug);
+    return false;
+  }, [activePlan, bookSlug]);
 
-  const abbrev    = book?.abbr ?? String(bookSlug).toUpperCase();
+  // Estado local para feedback visual imediato — garante que o botão
+  // vira "Lido ✓" sem esperar o PlanContext propagar o estado.
+  const [locallyRead, setLocallyRead] = useState<Set<string>>(new Set());
+
+  const safeReadIds: ReadonlySet<string> = readChapterIds ?? new Set<string>();
+  const isRead = safeReadIds.has(chapterId) || locallyRead.has(chapterId);
+
+  const abbrev = book?.abbr ?? String(bookSlug).toUpperCase();
   const reference = selected ? `${abbrev} ${chapterNum}:${selected.number}` : '';
 
   // ── Highlights ───────────────────────────────────────────────────
@@ -96,11 +116,12 @@ export default function ChapterReaderModal() {
   // ── Handlers ─────────────────────────────────────────────────────
 
   const handleMarkRead = async () => {
-    // FIX: null-check explícito antes de qualquer acesso
-    if (!book || !user) return;
+    if (!book || !user || !isInPlanScope) return;
+    setLocallyRead(prev => new Set([...prev, chapterId]));
     try {
       await markChapterRead(book.slug, book.name, chapterNum);
     } catch (e) {
+      setLocallyRead(prev => { const s = new Set(prev); s.delete(chapterId); return s; });
       console.warn('[Reader] Erro ao marcar como lido:', e);
     }
   };
@@ -165,8 +186,8 @@ export default function ChapterReaderModal() {
     setAddToSermonVerse({
       bookSlug: book.slug,
       bookName: book.name,
-      chapter:  chapterNum,
-      verse:    sel.number,
+      chapter: chapterNum,
+      verse: sel.number,
       verseText: sel.text,
       reference: `${abbrev} ${chapterNum}:${sel.number}`,
     });
@@ -186,7 +207,7 @@ export default function ChapterReaderModal() {
         return;
       }
       Alert.alert('Adicionar ao mapa', 'Escolha o mapa:', [
-        ...maps.slice(0, 5).map((m:any) => ({
+        ...maps.slice(0, 5).map(m => ({
           text: m.name,
           onPress: async () => {
             await ThematicMapRepository.addVerse({ mapId: m.id, bookSlug: book.slug, bookName: book.name, chapter: chapterNum, verse: sel.number, verseText: sel.text });
@@ -305,33 +326,35 @@ export default function ChapterReaderModal() {
           <MaterialCommunityIcons name="chevron-left" size={28} color={tokens.iconPrimary} />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={handleMarkRead}
-          style={{ flex: 1, borderRadius: 14, overflow: 'hidden' }}
-        >
-          {isRead ? (
-            <View style={{
-              flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-              backgroundColor: tokens.successBg, paddingVertical: 13, gap: 8,
-            }}>
-              <MaterialCommunityIcons name="check-circle" size={20} color={tokens.success} />
-              <Text style={{ fontSize: 15, fontWeight: '700', color: tokens.success }}>Lido ✓</Text>
-            </View>
-          ) : (
-            <LinearGradient
-              colors={['#6D28D9', '#8B5CF6']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                paddingVertical: 13, gap: 8,
-              }}
-            >
-              <MaterialCommunityIcons name="check-circle-outline" size={20} color="white" />
-              <Text style={{ fontSize: 15, fontWeight: '700', color: 'white' }}>Marcar como lido</Text>
-            </LinearGradient>
-          )}
-        </TouchableOpacity>
+        {/* Botão "Marcar como lido" só aparece quando o capítulo pertence ao plano ativo.
+            Fora do escopo do plano, mostra apenas o nome do capítulo como label neutro. */}
+        {isInPlanScope ? (
+          <TouchableOpacity
+            onPress={handleMarkRead}
+            style={{ flex: 1, borderRadius: 14, overflow: 'hidden' }}
+          >
+            {isRead ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: tokens.successBg, paddingVertical: 13, gap: 8 }}>
+                <MaterialCommunityIcons name="check-circle" size={20} color={tokens.success} />
+                <Text style={{ fontSize: 15, fontWeight: '700', color: tokens.success }}>Lido ✓</Text>
+              </View>
+            ) : (
+              <LinearGradient
+                colors={['#6D28D9', '#8B5CF6']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 13, gap: 8 }}
+              >
+                <MaterialCommunityIcons name="check-circle-outline" size={20} color="white" />
+                <Text style={{ fontSize: 15, fontWeight: '700', color: 'white' }}>Marcar como lido</Text>
+              </LinearGradient>
+            )}
+          </TouchableOpacity>
+        ) : (
+          // Fora do plano — label neutro, sem botão de ação
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, color: tokens.textTertiary }}>Leitura livre</Text>
+          </View>
+        )}
 
         <TouchableOpacity
           onPress={goToNext}
