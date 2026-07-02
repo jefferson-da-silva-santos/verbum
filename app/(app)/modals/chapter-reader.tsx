@@ -16,35 +16,35 @@
  *   - Adiciona null-checks em todos os pontos críticos
  */
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StatusBar,
   ActivityIndicator, Alert, Share,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets }            from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient }               from 'expo-linear-gradient';
+import { MaterialCommunityIcons }       from '@expo/vector-icons';
 
-import { useTheme } from '../../../src/context/ThemeContext';
-import { useAuthContext } from '../../../src/context/AuthContext';
-import { usePlanContext } from '../../../src/context/PlanContext';   // ← FIX: usa o context completo
-import { useBibleChapter } from '../../../src/hooks/useBibleChapter';
-import { VerseItem } from '../../../src/components/bible/VerseItem';
+import { useTheme }          from '../../../src/context/ThemeContext';
+import { useAuthContext }    from '../../../src/context/AuthContext';
+import { usePlanContext }    from '../../../src/context/PlanContext';   // ← FIX: usa o context completo
+import { useBibleChapter }  from '../../../src/hooks/useBibleChapter';
+import { VerseItem }        from '../../../src/components/bible/VerseItem';
 import { ChapterHeader, VerseActionSheet } from '../../../src/components/bible/ChapterHeader';
-import { findBook } from '../../../src/constants/bible';
+import { findBook }         from '../../../src/constants/bible';
 import { highlightRepo, favoriteRepo } from '../../../src/database/repositories';
 import { ThematicMapRepository } from '@/src/database/repositories/ThematicMapRepository';
-import type { Highlight } from '../../../src/database/types';
-import type { HighlightColor } from '../../../src/constants/bible';
-import { HIGHLIGHT_DEFINITIONS } from '../../../src/constants/bible';
-import { AddToSermonSheet } from '../../../src/components/sermon/AddToSermonSheet';
-import type { VerseToAdd } from '../../../src/components/sermon/AddToSermonSheet';
+import type { Highlight }              from '../../../src/database/types';
+import type { HighlightColor }         from '../../../src/constants/bible';
+import { HIGHLIGHT_DEFINITIONS }       from '../../../src/constants/bible';
+import { AddToSermonSheet }            from '../../../src/components/sermon/AddToSermonSheet';
+import type { VerseToAdd }             from '../../../src/components/sermon/AddToSermonSheet';
 
 export default function ChapterReaderModal() {
   const { tokens } = useTheme();
-  const insets = useSafeAreaInsets();
-  const { user } = useAuthContext();
+  const insets     = useSafeAreaInsets();
+  const { user }   = useAuthContext();
 
   // FIX: usePlanContext em vez de useActivePlan — tem readChapterIds e markChapterRead
   const { activePlan, markChapterRead, readChapterIds } = usePlanContext();
@@ -53,13 +53,13 @@ export default function ChapterReaderModal() {
     useLocalSearchParams<{ bookSlug: string; chapter: string }>();
 
   const chapterNum = parseInt(String(chapterParam), 10) || 1;
-  const book = findBook(String(bookSlug));
+  const book       = findBook(String(bookSlug));
 
   const { data, isLoading, error, isStale, reload } =
     useBibleChapter(String(bookSlug), chapterNum);
 
   const [highlights, setHighlights] = useState<Record<number, Highlight>>({});
-  const [selected, setSelected] = useState<{ number: number; text: string } | null>(null);
+  const [selected,   setSelected]   = useState<{ number: number; text: string } | null>(null);
   const [addToSermonVerse, setAddToSermonVerse] = useState<VerseToAdd | null>(null);
 
   // Progresso de leitura — barra fina sob a navbar, como Kindle/Medium
@@ -78,7 +78,7 @@ export default function ChapterReaderModal() {
   //   - Há um plano ativo E o livro faz parte do escopo do plano
   //   - OU não há plano ativo (leitura livre sem restrição de escopo)
   const isInPlanScope = useMemo(() => {
-    if (!activePlan) return true; // sem plano = leitura livre, mostra o botão
+    if (!activePlan) return false; // sem plano ativo = esconde o botão
     const scope = (activePlan.scopeData as any);
     if (!scope) return true;
     // Bíblia inteira / preset / testamento = todos os livros contam
@@ -97,7 +97,7 @@ export default function ChapterReaderModal() {
   const safeReadIds: ReadonlySet<string> = readChapterIds ?? new Set<string>();
   const isRead = safeReadIds.has(chapterId) || locallyRead.has(chapterId);
 
-  const abbrev = book?.abbr ?? String(bookSlug).toUpperCase();
+  const abbrev    = book?.abbr ?? String(bookSlug).toUpperCase();
   const reference = selected ? `${abbrev} ${chapterNum}:${selected.number}` : '';
 
   // ── Highlights ───────────────────────────────────────────────────
@@ -186,8 +186,8 @@ export default function ChapterReaderModal() {
     setAddToSermonVerse({
       bookSlug: book.slug,
       bookName: book.name,
-      chapter: chapterNum,
-      verse: sel.number,
+      chapter:  chapterNum,
+      verse:    sel.number,
       verseText: sel.text,
       reference: `${abbrev} ${chapterNum}:${sel.number}`,
     });

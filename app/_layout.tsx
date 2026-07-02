@@ -135,6 +135,10 @@ function RootNavigator() {
       <Stack.Screen name="(app)/modals/calibrate-speed" options={{ presentation: 'modal' }} />
       <Stack.Screen name="(app)/modals/plan-detail" options={{ presentation: 'modal' }} />
       <Stack.Screen name="(app)/modals/plan-editor" options={{ presentation: 'modal' }} />
+      <Stack.Screen
+    name="(app)/modals/book-chapters"
+    options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+  />
     </Stack>
   );
 }

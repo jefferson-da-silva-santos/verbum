@@ -131,7 +131,7 @@ export function VerseActionSheet({
         <View style={{ height: 1, backgroundColor: tokens.borderLight, marginHorizontal: 20, marginBottom: 4 }} />
 
         {/* Ações primárias (com ícone colorido em destaque) */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 20, paddingVertical: 12 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 20, paddingVertical: 12, width: '100%', justifyContent: 'space-around', alignItems: 'center' }}>
           {primaryActions.map(action => (
             <TouchableOpacity key={action.label} onPress={() => { action.onPress(); onClose(); }}
               style={{ alignItems: 'center', gap: 6, width: 90 }}>

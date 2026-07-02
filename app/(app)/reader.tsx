@@ -73,7 +73,7 @@ export default function ReaderScreen() {
         )}
         renderItem={({ item: book }) => (
           <TouchableOpacity
-            onPress={() => router.push(`/(app)/modals/chapter-reader?bookSlug=${book.slug}&chapter=1`)}
+            onPress={() => router.push({ pathname: '/(app)/modals/book-chapters' as any, params: { bookSlug: book.slug } })}
             style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: tokens.borderLight }}
           >
             <View style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: book.testament === 'OT' ? tokens.warningBg : tokens.infoBg, alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
