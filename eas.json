@@ -12,12 +12,18 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_BIBLIA_API_KEY": "bapi_q79vx4jtgfsfoom1q95jlawf5yb9so2ottzpfu4ncb6gkjrz"
       }
     },
     "production": {
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_BIBLIA_API_KEY": "bapi_q79vx4jtgfsfoom1q95jlawf5yb9so2ottzpfu4ncb6gkjrz"
       }
     }
   },
