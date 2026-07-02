@@ -16,10 +16,10 @@
  *   - Adiciona null-checks em todos os pontos críticos
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StatusBar,
-  ActivityIndicator, Alert, Share,
+  Alert, Share,
 } from 'react-native';
 import { useSafeAreaInsets }            from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -40,6 +40,7 @@ import type { HighlightColor }         from '../../../src/constants/bible';
 import { HIGHLIGHT_DEFINITIONS }       from '../../../src/constants/bible';
 import { AddToSermonSheet }            from '../../../src/components/sermon/AddToSermonSheet';
 import type { VerseToAdd }             from '../../../src/components/sermon/AddToSermonSheet';
+import { ChapterSkeleton }             from '../../../src/components/bible/ChapterSkeleton';
 
 export default function ChapterReaderModal() {
   const { tokens } = useTheme();
@@ -259,19 +260,11 @@ export default function ChapterReaderModal() {
 
       {/* Conteúdo */}
       {isLoading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 18 }}>
-          <LinearGradient
-            colors={[tokens.actionPrimary + '25', tokens.actionPrimary + '08']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{ width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' }}
-          >
-            <ActivityIndicator size="large" color={tokens.actionPrimary} />
-          </LinearGradient>
-          <Text style={{ fontSize: 14, color: tokens.textTertiary }}>
-            Carregando {book?.abbr ?? ''} {chapterNum}…
-          </Text>
-        </View>
+        <ChapterSkeleton
+          bookAbbr={book?.abbr}
+          bookName={book?.name}
+          chapterNum={chapterNum}
+        />
       ) : error ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 16 }}>
           <LinearGradient

@@ -8,9 +8,9 @@
  *     em vez de blocos soltos
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, ActivityIndicator,
+  View, Text, FlatList, TouchableOpacity, Animated, Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router }            from 'expo-router';
@@ -23,6 +23,75 @@ import { useAuthContext } from '../../src/context/AuthContext';
 import { planRepo }       from '../../src/database/repositories';
 import type { ReadingPlan } from '../../src/database/types';
 import { relativeDate }   from '../../src/utils/dateUtils';
+
+// ─── Skeleton da tela de planos ──────────────────────────────────
+// Imita a estrutura real: card de plano ativo (maior) + 2 cards menores
+
+function PlansSkeleton() {
+  const { tokens, isDark } = useTheme();
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 900, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+        Animated.timing(anim, { toValue: 0, duration: 900, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+      ]),
+    ).start();
+  }, []);
+
+  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.85] });
+  const bg      = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
+  const bgDeep  = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)';
+
+  return (
+    <View style={{ flex: 1, backgroundColor: tokens.bgPrimary, padding: 20, gap: 14 }}>
+
+      {/* Header stats — 3 pills */}
+      <Animated.View style={{ flexDirection: 'row', backgroundColor: tokens.bgCard, borderRadius: 16, borderWidth: 1, borderColor: tokens.borderLight, overflow: 'hidden', opacity }}>
+        {[0, 1, 2].map(i => (
+          <View key={i} style={{ flex: 1, alignItems: 'center', paddingVertical: 16, gap: 6, borderRightWidth: i < 2 ? 1 : 0, borderRightColor: tokens.borderLight }}>
+            <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: bg }} />
+            <View style={{ width: 28, height: 16, borderRadius: 5, backgroundColor: bgDeep }} />
+            <View style={{ width: 44, height: 10, borderRadius: 4, backgroundColor: bg }} />
+          </View>
+        ))}
+      </Animated.View>
+
+      {/* Card do plano ativo — maior, com gradiente simulado */}
+      <Animated.View style={{ borderRadius: 20, backgroundColor: tokens.actionPrimary + '20', borderWidth: 1, borderColor: tokens.actionPrimary + '30', padding: 20, gap: 14, opacity }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <View style={{ gap: 8, flex: 1 }}>
+            <View style={{ width: 64, height: 10, borderRadius: 4, backgroundColor: tokens.actionPrimary + '50' }} />
+            <View style={{ width: '75%', height: 17, borderRadius: 5, backgroundColor: tokens.actionPrimary + '40' }} />
+            <View style={{ width: 100, height: 10, borderRadius: 4, backgroundColor: tokens.actionPrimary + '30' }} />
+          </View>
+          <View style={{ width: 36, height: 26, borderRadius: 8, backgroundColor: tokens.actionPrimary + '30' }} />
+        </View>
+        {/* Barra de progresso */}
+        <View style={{ height: 7, borderRadius: 4, backgroundColor: tokens.actionPrimary + '25' }}>
+          <View style={{ height: '100%', width: '40%', borderRadius: 4, backgroundColor: tokens.actionPrimary + '50' }} />
+        </View>
+        <View style={{ width: 130, height: 10, borderRadius: 4, backgroundColor: tokens.actionPrimary + '25' }} />
+      </Animated.View>
+
+      {/* Rótulo "Todos os planos" */}
+      <Animated.View style={{ width: 100, height: 10, borderRadius: 4, backgroundColor: bg, opacity }} />
+
+      {/* Cards secundários */}
+      {[0, 1].map(i => (
+        <Animated.View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: tokens.bgCard, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: tokens.borderLight, opacity }}>
+          <View style={{ width: 44, height: 44, borderRadius: 13, backgroundColor: bg }} />
+          <View style={{ flex: 1, gap: 7 }}>
+            <View style={{ width: '70%', height: 14, borderRadius: 5, backgroundColor: bgDeep }} />
+            <View style={{ width: '45%', height: 11, borderRadius: 4, backgroundColor: bg }} />
+          </View>
+          <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: bg }} />
+        </Animated.View>
+      ))}
+    </View>
+  );
+}
 
 export default function PlansScreen() {
   const { tokens }    = useTheme();
@@ -53,11 +122,7 @@ export default function PlansScreen() {
   // ── Render ────────────────────────────────────────────────────
 
   if (isLoading) {
-    return (
-      <View style={{ flex: 1, backgroundColor: tokens.bgPrimary, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={tokens.actionPrimary} />
-      </View>
-    );
+    return <PlansSkeleton />;
   }
 
   return (

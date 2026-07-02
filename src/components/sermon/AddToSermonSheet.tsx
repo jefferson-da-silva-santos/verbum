@@ -169,7 +169,7 @@ export function AddToSermonSheet({
                   <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: tokens.actionPrimary + '15', alignItems: 'center', justifyContent: 'center' }}>
                     <MaterialCommunityIcons name="plus" size={20} color={tokens.actionPrimary} />
                   </View>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.actionPrimary }}>Criar novo sermão com este versículo</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.actionPrimary }}>Criar novo sermão com este versículo</Text>
                 </TouchableOpacity>
               ) : null
             }
